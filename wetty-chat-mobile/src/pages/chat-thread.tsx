@@ -49,6 +49,7 @@ import { VirtualScroll } from '@/components/chat/VirtualScroll';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { MessageComposeBar } from '@/components/chat/MessageComposeBar';
 import './chat-thread.scss';
+import { t } from '@lingui/core/macro';
 
 function generateClientId(): string {
   return `cg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -67,7 +68,7 @@ export default function ChatThread() {
 
   const dispatch = useDispatch();
   const storedName = useSelector((state: RootState) => selectChatName(state, apiChatId));
-  const chatName = threadId ? `Thread` : (storedName ?? (id ? `Chat ${id}` : 'Chat'));
+  const chatName = threadId ? t`Thread` : (storedName ?? t`Loading...`);
 
   useEffect(() => {
     if (!apiChatId || storedName != null) return;
@@ -125,7 +126,7 @@ export default function ChatThread() {
       })
       .catch((err: Error) => {
         dispatch(resetChat({ chatId: storeChatId, messages: [], nextCursor: null, prevCursor: null }));
-        showToast(err.message || 'Failed to load messages');
+        showToast(err.message || t`Failed to load messages`);
       });
   }, [apiChatId, storeChatId, threadId, dispatch, showToast]);
 
@@ -144,7 +145,7 @@ export default function ChatThread() {
         setPrependedCount(c => c + list.length);
       })
       .catch((err: Error) => {
-        showToast(err.message || 'Failed to load more');
+        showToast(err.message || t`Failed to load more`);
       })
       .finally(() => {
         loadingMoreRef.current = false;
@@ -165,7 +166,7 @@ export default function ChatThread() {
         dispatch(appendMessages({ chatId: storeChatId, messages: list, prevCursor: res.data.prev_cursor ?? null }));
       })
       .catch((err: Error) => {
-        showToast(err.message || 'Failed to load newer messages');
+        showToast(err.message || t`Failed to load newer messages`);
       })
       .finally(() => {
         loadingNewerRef.current = false;
@@ -191,7 +192,7 @@ export default function ChatThread() {
         setPrependedCount(0);
       })
       .catch((err: Error) => {
-        showToast(err.message || 'Failed to jump to message');
+        showToast(err.message || t`Failed to jump to message`);
       });
   }, [apiChatId, storeChatId, threadId, dispatch, showToast]);
 
@@ -214,7 +215,7 @@ export default function ChatThread() {
         .catch((err: Error) => {
           // Revert optimistic update
           dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: editingMessage }));
-          showToast(err.message || 'Failed to edit message');
+          showToast(err.message || t`Failed to edit message`);
         });
       return;
     }
@@ -262,7 +263,7 @@ export default function ChatThread() {
         dispatch(confirmPendingMessage({ chatId: storeChatId, clientGeneratedId, message: confirmed }));
       })
       .catch((err: Error) => {
-        showToast(err.message || 'Failed to send');
+        showToast(err.message || t`Failed to send`);
         const state = store.getState();
         const currentMessages = selectMessagesForChat(state, storeChatId);
         const without = currentMessages.filter(
@@ -278,27 +279,27 @@ export default function ChatThread() {
     presentActionSheet({
       buttons: [
         {
-          text: 'Reply', handler: () => {
+          text: t`Reply`, handler: () => {
             setReplyingTo(msg);
           }
         },
-        ...(!threadId ? [{ text: 'Start Thread', handler: () => { history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`); } }] : []),
+        ...(!threadId ? [{ text: t`Start Thread`, handler: () => { history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`); } }] : []),
         ...(isOwn ? [
           {
-            text: 'Edit', handler: () => {
+            text: t`Edit`, handler: () => {
               setReplyingTo(null);
               setEditingMessage(msg);
             }
           },
           {
-            text: 'Delete', role: 'destructive' as const, handler: () => {
+            text: t`Delete`, role: 'destructive' as const, handler: () => {
               deleteMessage(apiChatId, msg.id).catch((e: any) => {
-                showToast(e.message || 'Failed to delete message');
+                showToast(e.message || t`Failed to delete message`);
               });
             }
           }
         ] : []),
-        { text: 'Cancel', role: 'cancel' as const, handler: () => { } },
+        { text: t`Cancel`, role: 'cancel' as const, handler: () => { } },
       ],
     });
   }, [messages, apiChatId, threadId, history, showToast, presentActionSheet, setReplyingTo, setEditingMessage]);
@@ -309,26 +310,26 @@ export default function ChatThread() {
     presentActionSheet({
       buttons: [
         {
-          text: 'Reply', handler: () => {
+          text: t`Reply`, handler: () => {
             setReplyingTo(rootMessage);
           }
         },
         ...(isOwn ? [
           {
-            text: 'Edit', handler: () => {
+            text: t`Edit`, handler: () => {
               setReplyingTo(null);
               setEditingMessage(rootMessage);
             }
           },
           {
-            text: 'Delete', role: 'destructive' as const, handler: () => {
+            text: t`Delete`, role: 'destructive' as const, handler: () => {
               deleteMessage(apiChatId, rootMessage.id).catch((e: any) => {
-                showToast(e.message || 'Failed to delete message');
+                showToast(e.message || t`Failed to delete message`);
               });
             }
           }
         ] : []),
-        { text: 'Cancel', role: 'cancel' as const, handler: () => { } },
+        { text: t`Cancel`, role: 'cancel' as const, handler: () => { } },
       ],
     });
   }, [rootMessage, apiChatId, showToast, presentActionSheet, setReplyingTo, setEditingMessage]);
@@ -371,7 +372,7 @@ export default function ChatThread() {
           header={rootMessage ? (
             <ChatBubble
               senderName={`User ${rootMessage.sender_uid}`}
-              message={rootMessage.is_deleted ? '[Deleted]' : (rootMessage.message ?? '')}
+              message={rootMessage.is_deleted ? t`[Deleted]` : (rootMessage.message ?? '')}
               isSent={rootMessage.sender_uid === getCurrentUserId()}
               avatarColor={colorForUser(rootMessage.sender_uid)}
               onReply={() => setReplyingTo(rootMessage)}
@@ -383,7 +384,7 @@ export default function ChatThread() {
               edited={rootMessage.is_edited}
               replyTo={rootMessage.reply_to_message ? {
                 senderName: `User ${rootMessage.reply_to_message.sender_uid}`,
-                message: rootMessage.reply_to_message.is_deleted ? '[Deleted]' : (rootMessage.reply_to_message.message ?? ''),
+                message: rootMessage.reply_to_message.is_deleted ? t`[Deleted]` : (rootMessage.reply_to_message.message ?? ''),
                 avatarColor: colorForUser(rootMessage.reply_to_message.sender_uid),
               } : undefined}
             />
@@ -395,7 +396,7 @@ export default function ChatThread() {
             return (
               <ChatBubble
                 senderName={`User ${msg.sender_uid}`}
-                message={msg.is_deleted ? '[Deleted]' : (msg.message ?? '')}
+                message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
                 isSent={msg.sender_uid === getCurrentUserId()}
                 avatarColor={colorForUser(msg.sender_uid)}
                 onReply={() => setReplyingTo(msg)}
@@ -409,7 +410,7 @@ export default function ChatThread() {
                 onThreadClick={() => history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`)}
                 replyTo={msg.reply_to_message ? {
                   senderName: `User ${msg.reply_to_message.sender_uid}`,
-                  message: msg.reply_to_message.is_deleted ? '[Deleted]' : (msg.reply_to_message.message ?? ''),
+                  message: msg.reply_to_message.is_deleted ? t`[Deleted]` : (msg.reply_to_message.message ?? ''),
                   avatarColor: colorForUser(msg.reply_to_message.sender_uid),
                 } : undefined}
               />
