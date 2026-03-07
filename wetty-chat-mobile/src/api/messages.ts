@@ -16,11 +16,14 @@ export interface Attachment {
   file_name: string;
 }
 
+export interface ThreadInfo {
+  reply_count: number;
+}
+
 export interface MessageResponse {
   id: string;
   message: string | null;
   message_type: string;
-  reply_to_id: string | null;
   reply_root_id: string | null;
   client_generated_id: string;
   sender_uid: number;
@@ -29,7 +32,7 @@ export interface MessageResponse {
   is_edited: boolean;
   is_deleted: boolean;
   has_attachments: boolean;
-  has_thread: boolean;
+  thread_info?: ThreadInfo;
   reply_to_message?: ReplyToMessage;
   attachments?: Attachment[];
 }
@@ -44,7 +47,7 @@ export interface CreateMessageBody {
   message?: string;
   message_type: string;
   client_generated_id: string;
-  reply_to_id?: string;
+  reply_to_id?: string; // Keep in CreateMessageBody
   reply_root_id?: string;
   attachment_ids?: string[];
 }

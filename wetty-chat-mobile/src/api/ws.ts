@@ -7,7 +7,7 @@ import { getCurrentUserId } from '@/js/current-user';
 import store from '@/store/index';
 import { addMessage, confirmPendingMessage, updateMessageInStore } from '@/store/messagesSlice';
 import { setWsConnected } from '@/store/connectionSlice';
-import type { MessageResponse, ReplyToMessage } from '@/api/messages';
+import type { MessageResponse, ReplyToMessage, ThreadInfo } from '@/api/messages';
 
 const WS_PATH = '/_api/ws';
 const PING_INTERVAL_MS = 10_000;
@@ -80,11 +80,18 @@ function normalizePayload(p: unknown): MessageResponse | null {
     file_name: typeof a.file_name === 'string' ? a.file_name : 'attachment',
   }));
 
+  let thread_info: ThreadInfo | undefined;
+  if (o.thread_info != null && typeof o.thread_info === 'object') {
+    const ti = o.thread_info as Record<string, unknown>;
+    thread_info = {
+      reply_count: typeof ti.reply_count === 'number' ? ti.reply_count : 0,
+    };
+  }
+
   return {
     id: id ?? '0',
     message,
     message_type,
-    reply_to_id: o.reply_to_id != null ? String(o.reply_to_id) : null,
     reply_root_id: o.reply_root_id != null ? String(o.reply_root_id) : null,
     reply_to_message,
     client_generated_id,
@@ -94,7 +101,7 @@ function normalizePayload(p: unknown): MessageResponse | null {
     is_edited: Boolean(o.is_edited),
     is_deleted: Boolean(o.is_deleted),
     has_attachments: Boolean(o.has_attachments),
-    has_thread: Boolean(o.has_thread),
+    thread_info,
     attachments,
   };
 }

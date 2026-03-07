@@ -9,7 +9,7 @@ use diesel::prelude::*;
 use serde::Serialize;
 
 use crate::handlers::members::check_membership;
-use crate::models::{Attachment, AttachmentResponse, Message, NewMessage};
+use crate::models::{Attachment, AttachmentResponse, Message, NewMessage, ThreadInfo};
 use crate::schema::{attachments, group_membership, groups, messages, users};
 use crate::services::push::PushJob;
 use crate::utils::auth::CurrentUid;
@@ -65,8 +65,6 @@ pub struct MessageResponse {
     message: Option<String>,
     message_type: String,
     #[serde(with = "crate::serde_i64_string::opt")]
-    reply_to_id: Option<i64>,
-    #[serde(with = "crate::serde_i64_string::opt")]
     reply_root_id: Option<i64>,
     client_generated_id: String,
     sender_uid: i32,
@@ -76,7 +74,7 @@ pub struct MessageResponse {
     is_edited: bool,
     is_deleted: bool,
     has_attachments: bool,
-    pub has_thread: bool,
+    thread_info: Option<ThreadInfo>,
     reply_to_message: Option<Box<ReplyToMessage>>,
     attachments: Vec<AttachmentResponse>,
 }
@@ -100,7 +98,6 @@ impl From<Message> for MessageResponse {
                 m.message
             },
             message_type: m.message_type,
-            reply_to_id: m.reply_to_id,
             reply_root_id: m.reply_root_id,
             client_generated_id: m.client_generated_id,
             sender_uid: m.sender_uid,
@@ -109,7 +106,7 @@ impl From<Message> for MessageResponse {
             is_edited: m.updated_at.is_some(),
             is_deleted: m.deleted_at.is_some(),
             has_attachments: m.has_attachments,
-            has_thread: m.has_thread,
+            thread_info: None,
             reply_to_message: None,
             attachments: vec![],
         }
@@ -159,6 +156,29 @@ async fn attach_replies(
         }
     }
 
+    let mut thread_counts_map: std::collections::HashMap<i64, i64> =
+        std::collections::HashMap::new();
+    let thread_root_ids: Vec<i64> = messages_to_process
+        .iter()
+        .filter(|m| m.has_thread)
+        .map(|m| m.id)
+        .collect();
+    if !thread_root_ids.is_empty() {
+        use crate::schema::messages::dsl as m_dsl;
+        let counts: Vec<(Option<i64>, i64)> = messages::table
+            .filter(m_dsl::reply_root_id.eq_any(&thread_root_ids))
+            .filter(m_dsl::deleted_at.is_null())
+            .group_by(m_dsl::reply_root_id)
+            .select((m_dsl::reply_root_id, diesel::dsl::count_star()))
+            .load(conn)
+            .unwrap_or_default();
+        for (root_id_opt, count) in counts {
+            if let Some(root_id) = root_id_opt {
+                thread_counts_map.insert(root_id, count);
+            }
+        }
+    }
+
     let mut responses = Vec::with_capacity(messages_to_process.len());
     for m in messages_to_process {
         let reply_to_message = m.reply_to_id.and_then(|reply_id| {
@@ -202,7 +222,6 @@ async fn attach_replies(
                 m.message
             },
             message_type: m.message_type,
-            reply_to_id: m.reply_to_id,
             reply_root_id: m.reply_root_id,
             client_generated_id: m.client_generated_id,
             sender_uid: m.sender_uid,
@@ -211,7 +230,13 @@ async fn attach_replies(
             is_edited: m.updated_at.is_some(),
             is_deleted: m.deleted_at.is_some(),
             has_attachments: m.has_attachments,
-            has_thread: m.has_thread,
+            thread_info: if m.has_thread {
+                Some(ThreadInfo {
+                    reply_count: *thread_counts_map.get(&m.id).unwrap_or(&0),
+                })
+            } else {
+                None
+            },
             reply_to_message,
             attachments,
         });
@@ -507,7 +532,6 @@ pub async fn post_message(
             new_msg.message
         },
         message_type: new_msg.message_type,
-        reply_to_id: new_msg.reply_to_id,
         reply_root_id: new_msg.reply_root_id,
         client_generated_id: new_msg.client_generated_id,
         sender_uid: new_msg.sender_uid,
@@ -516,7 +540,7 @@ pub async fn post_message(
         is_edited: new_msg.updated_at.is_some(),
         is_deleted: new_msg.deleted_at.is_some(),
         has_attachments: new_msg.has_attachments,
-        has_thread: new_msg.has_thread,
+        thread_info: None,
         reply_to_message,
         attachments: {
             let mut att_responses = Vec::new();
@@ -698,7 +722,6 @@ pub async fn post_thread_message(
             new_msg.message
         },
         message_type: new_msg.message_type,
-        reply_to_id: new_msg.reply_to_id,
         reply_root_id: new_msg.reply_root_id,
         client_generated_id: new_msg.client_generated_id,
         sender_uid: new_msg.sender_uid,
@@ -707,7 +730,7 @@ pub async fn post_thread_message(
         is_edited: new_msg.updated_at.is_some(),
         is_deleted: new_msg.deleted_at.is_some(),
         has_attachments: new_msg.has_attachments,
-        has_thread: new_msg.has_thread,
+        thread_info: None,
         reply_to_message,
         attachments: {
             let mut att_responses = Vec::new();

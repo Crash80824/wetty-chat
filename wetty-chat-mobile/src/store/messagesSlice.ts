@@ -157,7 +157,8 @@ const messagesSlice = createSlice({
         for (let i = 0; i < win.messages.length; i++) {
           const m = win.messages[i];
           if (!message.is_deleted && m.id === messageId) {
-            const preservedReplyTo = message.reply_to_message ?? (message.reply_to_id === m.reply_to_id ? m.reply_to_message : undefined);
+            // Use existing reply_to_message if the incoming update doesn't have it but is for the same reply
+            const preservedReplyTo = message.reply_to_message ?? (message.reply_to_message === undefined && m.reply_to_message !== undefined ? m.reply_to_message : undefined);
             win.messages[i] = { ...message, reply_to_message: preservedReplyTo };
           } else if (m.reply_to_message?.id === messageId) {
             m.reply_to_message.message = message.message;

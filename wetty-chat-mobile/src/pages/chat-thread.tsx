@@ -14,6 +14,7 @@ import {
   IonFabButton,
   useIonToast,
   useIonActionSheet,
+  useIonAlert,
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import { people, settings, chevronDown } from 'ionicons/icons';
@@ -119,6 +120,7 @@ export default function ChatThread() {
 
   const [presentToast] = useIonToast();
   const [presentActionSheet] = useIonActionSheet();
+  const [presentAlert] = useIonAlert();
 
   const showToast = useCallback((text: string, duration = 3000) => {
     presentToast({ message: text, duration, position: 'bottom' });
@@ -253,7 +255,6 @@ export default function ChatThread() {
       id: clientGeneratedId,
       message: text,
       message_type: 'text',
-      reply_to_id: replyingTo?.id ?? null,
       reply_root_id: threadId ?? null,
       reply_to_message: replyingTo ? {
         id: replyingTo.id,
@@ -268,7 +269,7 @@ export default function ChatThread() {
       is_edited: false,
       is_deleted: false,
       has_attachments: (attachmentIds && attachmentIds.length > 0) || false,
-      has_thread: false,
+      thread_info: undefined,
     };
     dispatch(addMessage({ chatId: storeChatId, message: optimistic }));
     setReplyingTo(null);
@@ -315,7 +316,7 @@ export default function ChatThread() {
             setReplyingTo(msg);
           }
         },
-        ...(!threadId && !msg.has_thread ? [{ text: t`Start Thread`, handler: () => { history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`); } }] : []),
+        ...(!threadId && !msg.thread_info ? [{ text: t`Start Thread`, handler: () => { history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`); } }] : []),
         ...(isOwn ? [
           {
             text: t`Edit`, handler: () => {
@@ -325,11 +326,22 @@ export default function ChatThread() {
           },
           {
             text: t`Delete`, role: 'destructive' as const, handler: () => {
-              const deletedOptimistic = { ...msg, is_deleted: true };
-              dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: deletedOptimistic }));
-              deleteMessage(apiChatId, msg.id).catch((e: any) => {
-                dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: msg }));
-                showToast(e.message || t`Failed to delete message`);
+              presentAlert({
+                header: t`Delete Message`,
+                message: t`Are you sure you want to delete this message?`,
+                buttons: [
+                  { text: t`Cancel`, role: 'cancel' as const },
+                  {
+                    text: t`Delete`, role: 'destructive' as const, handler: () => {
+                      const deletedOptimistic = { ...msg, is_deleted: true };
+                      dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: deletedOptimistic }));
+                      deleteMessage(apiChatId, msg.id).catch((e: any) => {
+                        dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: msg }));
+                        showToast(e.message || t`Failed to delete message`);
+                      });
+                    }
+                  }
+                ]
               });
             }
           }
@@ -337,7 +349,7 @@ export default function ChatThread() {
         { text: t`Cancel`, role: 'cancel' as const, handler: () => { } },
       ],
     });
-  }, [messages, apiChatId, threadId, history, showToast, presentActionSheet, setReplyingTo, setEditingMessage]);
+  }, [messages, apiChatId, threadId, history, showToast, presentActionSheet, setReplyingTo, setEditingMessage, presentAlert]);
 
 
 
@@ -418,13 +430,13 @@ export default function ChatThread() {
                   isSent={msg.sender_uid === getCurrentUserId()}
                   avatarColor={colorForUser(msg.sender_uid)}
                   onReply={() => setReplyingTo(msg)}
-                  onReplyTap={msg.reply_to_id && !msg.reply_to_message?.is_deleted ? () => jumpToMessage(msg.reply_to_id!) : undefined}
+                  onReplyTap={msg.reply_to_message && !msg.reply_to_message?.is_deleted ? () => jumpToMessage(msg.reply_to_message!.id) : undefined}
                   onLongPress={() => onClickChatItem(index)}
                   showName={prevSender !== msg.sender_uid || showDateSeparator}
                   showAvatar={isLastInGroup}
                   timestamp={msg.created_at}
                   edited={msg.is_edited}
-                  hasThread={msg.has_thread && !threadId}
+                  threadInfo={!threadId ? msg.thread_info : undefined}
                   onThreadClick={() => history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`)}
                   attachments={msg.attachments}
                   isConfirmed={!msg.id.startsWith('cg_')}

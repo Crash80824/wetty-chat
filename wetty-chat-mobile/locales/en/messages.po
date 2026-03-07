@@ -13,8 +13,8 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/pages/chat-thread.tsx:350
-#: src/pages/chat-thread.tsx:365
+#: src/pages/chat-thread.tsx:429
+#: src/pages/chat-thread.tsx:445
 msgid "[Deleted]"
 msgstr "[Deleted]"
 
@@ -26,6 +26,10 @@ msgstr "Add"
 #: src/pages/chat-members.tsx:207
 msgid "Add Member"
 msgstr "Add Member"
+
+#: src/pages/chat-thread.tsx:331
+msgid "Are you sure you want to delete this message?"
+msgstr "Are you sure you want to delete this message?"
 
 #: src/pages/chat-members.tsx:148
 msgid "Are you sure you want to leave this group?"
@@ -45,7 +49,8 @@ msgstr "Avatar URL"
 #: src/pages/chat-members.tsx:127
 #: src/pages/chat-members.tsx:150
 #: src/pages/chat-members.tsx:182
-#: src/pages/chat-thread.tsx:300
+#: src/pages/chat-thread.tsx:333
+#: src/pages/chat-thread.tsx:349
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -54,9 +59,14 @@ msgstr "Cancel"
 msgid "Chats"
 msgstr "Chats"
 
-#: src/pages/chat-thread.tsx:293
+#: src/pages/chat-thread.tsx:328
+#: src/pages/chat-thread.tsx:335
 msgid "Delete"
 msgstr "Delete"
+
+#: src/pages/chat-thread.tsx:330
+msgid "Delete Message"
+msgstr "Delete Message"
 
 #: src/pages/chat-members.tsx:129
 msgid "Demote"
@@ -78,11 +88,11 @@ msgstr "Demote to Member"
 msgid "Description"
 msgstr "Description"
 
-#: src/pages/chat-thread.tsx:287
+#: src/pages/chat-thread.tsx:322
 msgid "Edit"
 msgstr "Edit"
 
-#: src/components/chat/ChatBubble.tsx:183
+#: src/components/chat/ChatBubble.tsx:198
 msgid "Edited"
 msgstr "Edited"
 
@@ -106,15 +116,15 @@ msgstr "Enter user ID to add:"
 msgid "Failed to add member"
 msgstr "Failed to add member"
 
-#: src/pages/chat-thread.tsx:295
+#: src/pages/chat-thread.tsx:340
 msgid "Failed to delete message"
 msgstr "Failed to delete message"
 
-#: src/pages/chat-thread.tsx:210
+#: src/pages/chat-thread.tsx:247
 msgid "Failed to edit message"
 msgstr "Failed to edit message"
 
-#: src/pages/chat-thread.tsx:185
+#: src/pages/chat-thread.tsx:209
 msgid "Failed to jump to message"
 msgstr "Failed to jump to message"
 
@@ -130,15 +140,15 @@ msgstr "Failed to load chat details"
 msgid "Failed to load members"
 msgstr "Failed to load members"
 
-#: src/pages/chat-thread.tsx:119
+#: src/pages/chat-thread.tsx:143
 msgid "Failed to load messages"
 msgstr "Failed to load messages"
 
-#: src/pages/chat-thread.tsx:138
+#: src/pages/chat-thread.tsx:162
 msgid "Failed to load more"
 msgstr "Failed to load more"
 
-#: src/pages/chat-thread.tsx:159
+#: src/pages/chat-thread.tsx:183
 msgid "Failed to load newer messages"
 msgstr "Failed to load newer messages"
 
@@ -150,7 +160,7 @@ msgstr "Failed to remove member"
 msgid "Failed to save settings"
 msgstr "Failed to save settings"
 
-#: src/pages/chat-thread.tsx:264
+#: src/pages/chat-thread.tsx:300
 msgid "Failed to send"
 msgstr "Failed to send"
 
@@ -211,6 +221,10 @@ msgstr "Member promoted"
 msgid "Member removed"
 msgstr "Member removed"
 
+#: src/pages/chat-thread.tsx:225
+msgid "Message cannot be empty"
+msgstr "Message cannot be empty"
+
 #: src/pages/chat-settings.tsx:152
 msgid "Private"
 msgstr "Private"
@@ -251,8 +265,16 @@ msgstr "Remove from Group"
 msgid "Remove Member"
 msgstr "Remove Member"
 
-#: src/components/chat/ChatBubble.tsx:206
-#: src/pages/chat-thread.tsx:280
+#: src/components/chat/ChatBubble.tsx:211
+msgid "replies"
+msgstr "replies"
+
+#: src/components/chat/ChatBubble.tsx:211
+msgid "reply"
+msgstr "reply"
+
+#: src/components/chat/ChatBubble.tsx:216
+#: src/pages/chat-thread.tsx:315
 msgid "Reply"
 msgstr "Reply"
 
@@ -273,13 +295,17 @@ msgstr "Settings"
 msgid "Settings saved"
 msgstr "Settings saved"
 
-#: src/pages/chat-thread.tsx:284
+#: src/pages/chat-thread.tsx:319
 msgid "Start Thread"
 msgstr "Start Thread"
 
 #: src/pages/chat-thread.tsx:71
 msgid "Thread"
 msgstr "Thread"
+
+#: src/pages/chat-thread.tsx:94
+msgid "Today"
+msgstr "Today"
 
 #. placeholder {0}: member.uid
 #: src/pages/chat-members.tsx:93
@@ -293,9 +319,13 @@ msgid "User ID"
 msgstr "User ID"
 
 #: src/components/chat/ChatBubble.tsx:201
-msgid "View Thread"
-msgstr "View Thread"
+#~ msgid "View Thread"
+#~ msgstr "View Thread"
 
 #: src/pages/chat-settings.tsx:146
 msgid "Visibility"
 msgstr "Visibility"
+
+#: src/pages/chat-thread.tsx:98
+msgid "Yesterday"
+msgstr "Yesterday"

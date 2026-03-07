@@ -25,7 +25,7 @@ interface ChatBubbleProps {
   timestamp?: string;
   edited?: boolean;
   isConfirmed?: boolean;
-  hasThread?: boolean;
+  threadInfo?: { reply_count: number };
   onThreadClick?: () => void;
   attachments?: Attachment[];
 }
@@ -58,7 +58,7 @@ export function ChatBubble({
   timestamp,
   edited,
   isConfirmed,
-  hasThread,
+  threadInfo,
   onThreadClick,
   attachments,
 }: ChatBubbleProps) {
@@ -205,10 +205,10 @@ export function ChatBubble({
                 </span>
               )}
             </div>
-            {hasThread && (
+            {threadInfo && (
               <div className={styles.threadIndicator} onClick={onThreadClick}>
                 <IonIcon icon={chatbubbles} />
-                <span>{t`View Thread`}</span>
+                <span>{threadInfo.reply_count} {threadInfo.reply_count === 1 ? t`reply` : t`replies`}</span>
               </div>
             )}
           </div>

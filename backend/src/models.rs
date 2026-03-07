@@ -70,6 +70,11 @@ pub struct Message {
     pub has_thread: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ThreadInfo {
+    pub reply_count: i64,
+}
+
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = schema::messages)]
 pub struct NewMessage {
