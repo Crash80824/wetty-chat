@@ -80,6 +80,29 @@ export default function ChatThread() {
   }, [apiChatId, storedName, dispatch]);
   const messages = useSelector((state: RootState) => selectMessagesForChat(state, storeChatId));
 
+  const formatDateSeparator = useCallback((iso: string) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    const now = new Date();
+
+    const isSameDay = (d1: Date, d2: Date) =>
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate();
+
+    if (isSameDay(date, now)) return t`Today`;
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (isSameDay(date, yesterday)) return t`Yesterday`;
+
+    return date.toLocaleDateString(undefined, {
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+      month: 'short',
+      day: 'numeric'
+    });
+  }, []);
+
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const scrollToIndexRef = useRef<((index: number, behavior?: ScrollBehavior) => void) | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -356,31 +379,62 @@ export default function ChatThread() {
 
           renderItem={(index: number) => {
             const msg = messages[index];
-            const prevSender = index > 0 ? messages[index - 1].sender_uid : null;
-            const nextSender = index < messages.length - 1 ? messages[index + 1].sender_uid : null;
+            const prevMsg = index > 0 ? messages[index - 1] : null;
+            const nextMsg = index < messages.length - 1 ? messages[index + 1] : null;
+
+            const prevSender = prevMsg ? prevMsg.sender_uid : null;
+            const nextSender = nextMsg ? nextMsg.sender_uid : null;
+
+            let showDateSeparator = false;
+            if (index === 0) {
+              showDateSeparator = true;
+            } else if (prevMsg) {
+              const d1 = new Date(msg.created_at);
+              const d2 = new Date(prevMsg.created_at);
+              if (d1.getFullYear() !== d2.getFullYear() || d1.getMonth() !== d2.getMonth() || d1.getDate() !== d2.getDate()) {
+                showDateSeparator = true;
+              }
+            }
+
+            let isLastInGroup = nextSender !== msg.sender_uid;
+            if (!isLastInGroup && nextMsg) {
+              const d1 = new Date(msg.created_at);
+              const d2 = new Date(nextMsg.created_at);
+              if (d1.getFullYear() !== d2.getFullYear() || d1.getMonth() !== d2.getMonth() || d1.getDate() !== d2.getDate()) {
+                isLastInGroup = true;
+              }
+            }
+
             return (
-              <ChatBubble
-                senderName={`User ${msg.sender_uid}`}
-                message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
-                isSent={msg.sender_uid === getCurrentUserId()}
-                avatarColor={colorForUser(msg.sender_uid)}
-                onReply={() => setReplyingTo(msg)}
-                onReplyTap={msg.reply_to_id && !msg.reply_to_message?.is_deleted ? () => jumpToMessage(msg.reply_to_id!) : undefined}
-                onLongPress={() => onClickChatItem(index)}
-                showName={prevSender !== msg.sender_uid}
-                showAvatar={nextSender !== msg.sender_uid}
-                timestamp={msg.created_at}
-                edited={msg.is_edited}
-                hasThread={msg.has_thread && !threadId}
-                onThreadClick={() => history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`)}
-                attachments={msg.attachments}
-                isConfirmed={!msg.id.startsWith('cg_')}
-                replyTo={msg.reply_to_message ? {
-                  senderName: `User ${msg.reply_to_message.sender_uid}`,
-                  message: msg.reply_to_message.is_deleted ? t`[Deleted]` : (msg.reply_to_message.message ?? ''),
-                  avatarColor: colorForUser(msg.reply_to_message.sender_uid),
-                } : undefined}
-              />
+              <>
+                {showDateSeparator && (
+                  <div className="chat-date-separator">
+                    <span>{formatDateSeparator(msg.created_at)}</span>
+                  </div>
+                )}
+                <ChatBubble
+                  senderName={`User ${msg.sender_uid}`}
+                  message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
+                  isSent={msg.sender_uid === getCurrentUserId()}
+                  avatarColor={colorForUser(msg.sender_uid)}
+                  onReply={() => setReplyingTo(msg)}
+                  onReplyTap={msg.reply_to_id && !msg.reply_to_message?.is_deleted ? () => jumpToMessage(msg.reply_to_id!) : undefined}
+                  onLongPress={() => onClickChatItem(index)}
+                  showName={prevSender !== msg.sender_uid || showDateSeparator}
+                  showAvatar={isLastInGroup}
+                  timestamp={msg.created_at}
+                  edited={msg.is_edited}
+                  hasThread={msg.has_thread && !threadId}
+                  onThreadClick={() => history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`)}
+                  attachments={msg.attachments}
+                  isConfirmed={!msg.id.startsWith('cg_')}
+                  replyTo={msg.reply_to_message ? {
+                    senderName: `User ${msg.reply_to_message.sender_uid}`,
+                    message: msg.reply_to_message.is_deleted ? t`[Deleted]` : (msg.reply_to_message.message ?? ''),
+                    avatarColor: colorForUser(msg.reply_to_message.sender_uid),
+                  } : undefined}
+                />
+              </>
             );
           }}
         />

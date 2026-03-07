@@ -77,6 +77,7 @@ function normalizePayload(p: unknown): MessageResponse | null {
     url: typeof a.url === 'string' ? a.url : '',
     kind: typeof a.kind === 'string' ? a.kind : 'unknown',
     size: typeof a.size === 'number' ? a.size : 0,
+    file_name: typeof a.file_name === 'string' ? a.file_name : 'attachment',
   }));
 
   return {

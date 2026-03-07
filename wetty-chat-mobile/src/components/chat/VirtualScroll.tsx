@@ -156,6 +156,13 @@ export function VirtualScroll({
   useLayoutEffect(() => {
     const newPrepended = prependedCount - prevPrependedCountRef.current;
     if (newPrepended > 0 && hasInitialScrolled.current) {
+      if (heightCache.current.size > 0) {
+        const newCache = new Map<number, number>();
+        for (const [k, v] of heightCache.current.entries()) {
+          newCache.set(k + newPrepended, v);
+        }
+        heightCache.current = newCache;
+      }
       const el = containerRef.current;
       if (el) {
         let addedHeight = 0;
@@ -247,6 +254,16 @@ export function VirtualScroll({
     if (prev !== height) {
       heightCache.current.set(index, height);
       forceUpdate(c => c + 1);
+
+      const el = containerRef.current;
+      if (el && prev !== undefined) {
+        const diff = height - prev;
+        const itemOffset = getItemOffset(index);
+        if (itemOffset < el.scrollTop) {
+          el.scrollTop += diff;
+          setScrollTop(el.scrollTop);
+        }
+      }
 
       // Re-adjust scroll for jump target after items are measured
       const targetIdx = initialScrollIndexRef.current;

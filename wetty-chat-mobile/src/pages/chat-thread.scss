@@ -64,6 +64,29 @@
 }
 
 /* Message rows */
+.chat-date-separator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0 8px;
+
+  span {
+    background-color: var(--ion-color-step-150, rgba(0, 0, 0, 0.08));
+    color: var(--ion-color-step-600, #555);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 12px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .chat-date-separator span {
+    background-color: var(--ion-color-step-850, rgba(255, 255, 255, 0.1));
+    color: var(--ion-color-step-300, #ccc);
+  }
+}
+
 .message-row {
   display: flex;
   align-items: flex-end;
