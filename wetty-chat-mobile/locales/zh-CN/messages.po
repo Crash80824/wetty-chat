@@ -13,10 +13,8 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/pages/chat-thread.tsx:375
-#: src/pages/chat-thread.tsx:387
-#: src/pages/chat-thread.tsx:399
-#: src/pages/chat-thread.tsx:413
+#: src/pages/chat-thread.tsx:350
+#: src/pages/chat-thread.tsx:365
 msgid "[Deleted]"
 msgstr "[已删除]"
 
@@ -33,7 +31,8 @@ msgstr "添加成员"
 msgid "Are you sure you want to leave this group?"
 msgstr "确定要退出该群组吗？"
 
-#: src/pages/settings/language.tsx:56
+#: src/pages/settings.tsx:58
+#: src/pages/settings/language.tsx:57
 msgid "Auto"
 msgstr "自动"
 
@@ -46,8 +45,7 @@ msgstr "头像链接"
 #: src/pages/chat-members.tsx:127
 #: src/pages/chat-members.tsx:150
 #: src/pages/chat-members.tsx:182
-#: src/pages/chat-thread.tsx:302
-#: src/pages/chat-thread.tsx:332
+#: src/pages/chat-thread.tsx:300
 msgid "Cancel"
 msgstr "取消"
 
@@ -56,8 +54,7 @@ msgstr "取消"
 msgid "Chats"
 msgstr "消息"
 
-#: src/pages/chat-thread.tsx:295
-#: src/pages/chat-thread.tsx:325
+#: src/pages/chat-thread.tsx:293
 msgid "Delete"
 msgstr "删除"
 
@@ -81,12 +78,11 @@ msgstr "降级为成员"
 msgid "Description"
 msgstr "描述"
 
-#: src/pages/chat-thread.tsx:289
-#: src/pages/chat-thread.tsx:319
+#: src/pages/chat-thread.tsx:287
 msgid "Edit"
 msgstr "编辑"
 
-#: src/components/chat/ChatBubble.tsx:180
+#: src/components/chat/ChatBubble.tsx:183
 msgid "Edited"
 msgstr "已编辑"
 
@@ -110,16 +106,15 @@ msgstr "输入要添加的用户 ID："
 msgid "Failed to add member"
 msgstr "添加成员失败"
 
-#: src/pages/chat-thread.tsx:297
-#: src/pages/chat-thread.tsx:327
+#: src/pages/chat-thread.tsx:295
 msgid "Failed to delete message"
 msgstr "删除消息失败"
 
-#: src/pages/chat-thread.tsx:218
+#: src/pages/chat-thread.tsx:210
 msgid "Failed to edit message"
 msgstr "编辑消息失败"
 
-#: src/pages/chat-thread.tsx:195
+#: src/pages/chat-thread.tsx:185
 msgid "Failed to jump to message"
 msgstr "跳转到消息失败"
 
@@ -135,15 +130,15 @@ msgstr "加载聊天详情失败"
 msgid "Failed to load members"
 msgstr "加载成员列表失败"
 
-#: src/pages/chat-thread.tsx:129
+#: src/pages/chat-thread.tsx:119
 msgid "Failed to load messages"
 msgstr "加载消息失败"
 
-#: src/pages/chat-thread.tsx:148
+#: src/pages/chat-thread.tsx:138
 msgid "Failed to load more"
 msgstr "加载更多失败"
 
-#: src/pages/chat-thread.tsx:169
+#: src/pages/chat-thread.tsx:159
 msgid "Failed to load newer messages"
 msgstr "加载新消息失败"
 
@@ -155,7 +150,7 @@ msgstr "移除成员失败"
 msgid "Failed to save settings"
 msgstr "保存设置失败"
 
-#: src/pages/chat-thread.tsx:266
+#: src/pages/chat-thread.tsx:264
 msgid "Failed to send"
 msgstr "发送失败"
 
@@ -256,9 +251,8 @@ msgstr "从群组中移除"
 msgid "Remove Member"
 msgstr "移除成员"
 
-#: src/components/chat/ChatBubble.tsx:191
-#: src/pages/chat-thread.tsx:282
-#: src/pages/chat-thread.tsx:313
+#: src/components/chat/ChatBubble.tsx:206
+#: src/pages/chat-thread.tsx:280
 msgid "Reply"
 msgstr "回复"
 
@@ -271,7 +265,7 @@ msgid "Saving..."
 msgstr "保存中..."
 
 #: src/App.tsx:70
-#: src/pages/settings.tsx:46
+#: src/pages/settings.tsx:50
 msgid "Settings"
 msgstr "设置"
 
@@ -279,7 +273,7 @@ msgstr "设置"
 msgid "Settings saved"
 msgstr "设置已保存"
 
-#: src/pages/chat-thread.tsx:286
+#: src/pages/chat-thread.tsx:284
 msgid "Start Thread"
 msgstr "发起话题"
 
@@ -298,7 +292,7 @@ msgstr "用户 {0}"
 msgid "User ID"
 msgstr "用户 ID"
 
-#: src/components/chat/ChatBubble.tsx:186
+#: src/components/chat/ChatBubble.tsx:201
 msgid "View Thread"
 msgstr "查看话题"
 

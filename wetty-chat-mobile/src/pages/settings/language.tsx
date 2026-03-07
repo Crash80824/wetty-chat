@@ -21,6 +21,7 @@ import { dynamicActivate, activateDetectedLocale } from '@/i18n';
 const locales = [
   { code: 'en', label: 'English' },
   { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
 ] as const;
 
 export default function LanguagePage() {

@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
 
-const supportedLocales = ["en", "zh-CN"];
+const supportedLocales = ["en", "zh-CN", "zh-TW"];
 const defaultLocale = "en";
 
 function detectLocale(): string {

@@ -19,6 +19,7 @@ import { getCurrentUserId, setCurrentUserId } from '@/js/current-user';
 import { Trans } from '@lingui/react/macro';
 
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { t } from '@lingui/core/macro';
 
 export default function Settings() {
   const [uidInput, setUidInput] = useState(String(getCurrentUserId()));
@@ -54,7 +55,7 @@ export default function Settings() {
           <IonList>
             <IonItem button onClick={() => history.push('/settings/language')}>
               <IonLabel>Language</IonLabel>
-              <span slot="end">{{ 'en': 'English', 'zh-CN': '简体中文' }[locale!] ?? 'Auto'}</span>
+              <span slot="end">{{ 'en': 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文' }[locale!] ?? t`Auto`}</span>
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">User ID</IonLabel>
