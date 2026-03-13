@@ -185,7 +185,7 @@ export function ChatBubble({
             <div className={styles.avatarSpacer} />
           )}
           <div className={styles.bubble}>
-            {!isSent && showName && <div className={styles.senderName}>{senderName}</div>}
+            {showName && <div className={styles.senderName}>{senderName}</div>}
             {replyTo && (
               <div
                 className={`${styles.replyPreview} ${onReplyTap ? styles.replyPreviewTappable : ''}`}
