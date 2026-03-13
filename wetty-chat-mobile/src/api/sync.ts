@@ -7,16 +7,11 @@ import store from '@/store/index';
 let isSyncing = false;
 let syncTimeout: ReturnType<typeof setTimeout> | null = null;
 
-interface NavigatorWithBadge extends Navigator {
-  setAppBadge?: (count: number) => Promise<void>;
-  clearAppBadge?: () => Promise<void>;
-}
-
 /**
  * Robustly synchronizes the app state when coming to the foreground or reconnecting.
  * - Fetches the latest chats list (updating previews and unread counts).
  * - Updates the system app badge.
- * - Checks currently loaded chat windows and fetches any missing messages 
+ * - Checks currently loaded chat windows and fetches any missing messages
  *   (appending them seamlessly so as not to disrupt a user scrolling history).
  */
 export async function syncApp() {
@@ -38,14 +33,13 @@ export async function syncApp() {
 
       try {
         const badgeRes = await getUnreadCount();
-        const nav = navigator as NavigatorWithBadge;
         if (badgeRes.data.unread_count > 0) {
-          if (nav.setAppBadge) {
-            nav.setAppBadge(badgeRes.data.unread_count).catch(console.error);
+          if (navigator.setAppBadge) {
+            navigator.setAppBadge(badgeRes.data.unread_count).catch(console.error);
           }
         } else {
-          if (nav.clearAppBadge) {
-            nav.clearAppBadge().catch(console.error);
+          if (navigator.clearAppBadge) {
+            navigator.clearAppBadge().catch(console.error);
           }
         }
       } catch (badgeErr) {
