@@ -8,6 +8,7 @@ import store from '@/store/index';
 import { addMessage, confirmPendingMessage, updateMessageInStore } from '@/store/messagesSlice';
 import { updateChatFromMessage } from '@/store/chatsSlice';
 import { setWsConnected } from '@/store/connectionSlice';
+import { syncApp } from '@/api/sync';
 import type { MessageResponse, ReplyToMessage, ThreadInfo } from '@/api/messages';
 
 const WS_PATH = import.meta.env.BASE_URL + '_api/ws';
@@ -183,6 +184,9 @@ export function initWebSocket(): void {
       clearReconnectTimeout();
       store.dispatch(setWsConnected(true));
       console.log('ws opened');
+      
+      syncApp();
+      
       pingIntervalId = setInterval(() => {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(PING_JSON);

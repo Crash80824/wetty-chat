@@ -33,6 +33,7 @@ import { Trans } from '@lingui/react/macro';
 import { getCurrentUserId } from './js/current-user';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { t } from '@lingui/core/macro';
+import { syncApp } from '@/api/sync';
 
 setupIonicReact();
 
@@ -58,6 +59,25 @@ const App: React.FC = () => {
     }
     dispatch(fetchCurrentUser());
   }, [dispatch]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncApp();
+      }
+    };
+    const handleOnline = () => {
+      syncApp();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
 
   const tabBarButtons = [
     (
