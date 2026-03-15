@@ -17,7 +17,7 @@ import {
   useIonAlert,
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
-import { people, settings, chevronDown } from 'ionicons/icons';
+import { settings, chevronDown } from 'ionicons/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   getMessages,
