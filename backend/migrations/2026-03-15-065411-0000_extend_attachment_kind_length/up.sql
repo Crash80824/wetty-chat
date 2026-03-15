@@ -1,0 +1,1 @@
+ALTER TABLE attachments ALTER COLUMN kind TYPE VARCHAR(255);

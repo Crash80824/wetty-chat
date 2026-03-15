@@ -18,7 +18,7 @@ diesel::table! {
     attachments (id) {
         id -> Int8,
         message_id -> Nullable<Int8>,
-        #[max_length = 20]
+        #[max_length = 255]
         kind -> Varchar,
         external_reference -> Text,
         size -> Int8,
