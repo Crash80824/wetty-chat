@@ -23,6 +23,7 @@ pub fn get_unread_counts(
         .filter(group_membership::uid.eq_any(target_uids))
         .filter(messages::id.gt(coalesce(group_membership::last_read_message_id, 0i64)))
         .filter(messages::deleted_at.is_null())
+        .filter(messages::reply_root_id.is_null())
         .group_by(group_membership::uid)
         .select((group_membership::uid, diesel::dsl::count(messages::id)));
 

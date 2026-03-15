@@ -89,6 +89,8 @@ async fn get_chats(
             AND
                 reply_root_id IS NULL
             AND
+                deleted_at IS NULL
+            AND
                 id > COALESCE(group_membership.last_read_message_id, 0))",
     );
 
@@ -1033,6 +1035,61 @@ async fn delete_message(
                 "Failed to delete message",
             )
         })?;
+
+    // If the deleted message was the group's last_message_id, recalculate it
+    {
+        use crate::schema::groups::dsl as g_dsl;
+        let group_last_msg: Option<i64> = groups::table
+            .filter(g_dsl::id.eq(chat_id))
+            .select(g_dsl::last_message_id)
+            .first::<Option<i64>>(conn)
+            .map_err(|e| {
+                tracing::error!("fetch group last_message_id: {:?}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+            })?;
+
+        if group_last_msg == Some(message_id) {
+            let prev_message: Option<(i64, DateTime<Utc>)> = messages::table
+                .filter(dsl::chat_id.eq(chat_id))
+                .filter(dsl::deleted_at.is_null())
+                .filter(dsl::reply_root_id.is_null())
+                .order(dsl::id.desc())
+                .select((dsl::id, dsl::created_at))
+                .first(conn)
+                .optional()
+                .map_err(|e| {
+                    tracing::error!("find previous message: {:?}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+                })?;
+
+            match prev_message {
+                Some((prev_id, prev_at)) => {
+                    diesel::update(groups::table.filter(g_dsl::id.eq(chat_id)))
+                        .set((
+                            g_dsl::last_message_id.eq(Some(prev_id)),
+                            g_dsl::last_message_at.eq(Some(prev_at)),
+                        ))
+                        .execute(conn)
+                        .map_err(|e| {
+                            tracing::error!("update group last_message: {:?}", e);
+                            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+                        })?;
+                }
+                None => {
+                    diesel::update(groups::table.filter(g_dsl::id.eq(chat_id)))
+                        .set((
+                            g_dsl::last_message_id.eq(None::<i64>),
+                            g_dsl::last_message_at.eq(None::<DateTime<Utc>>),
+                        ))
+                        .execute(conn)
+                        .map_err(|e| {
+                            tracing::error!("clear group last_message: {:?}", e);
+                            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+                        })?;
+                }
+            }
+        }
+    }
 
     let response = attach_replies(conn, vec![deleted_message], &state)
         .await
