@@ -8,8 +8,6 @@
 
 .landing-hero {
   padding: calc(24px + env(safe-area-inset-top)) 20px 12px;
-  display: grid;
-  gap: 16px;
 }
 
 .landing-hero__copy h1 {
@@ -34,40 +32,53 @@
   margin-top: 22px;
 }
 
-.landing-hero__panel {
-  padding: 18px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(22, 50, 79, 0.08);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 20px 50px rgba(17, 38, 58, 0.12);
-}
-
-.landing-hero__panel-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: rgba(22, 50, 79, 0.66);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.landing-hero__panel h2 {
-  margin: 16px 0 8px;
-  font-size: 1.8rem;
-}
-
-.landing-hero__panel p {
-  margin: 0;
-  color: rgba(22, 50, 79, 0.76);
-  line-height: 1.5;
-}
-
 .landing-grid {
   display: grid;
   gap: 16px;
   padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
+}
+
+.landing-platform-segment {
+  padding: 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(22, 50, 79, 0.08);
+  box-shadow: 0 14px 32px rgba(17, 38, 58, 0.08);
+}
+
+ion-segment-button {
+  min-width: initial;
+}
+
+.landing-inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  //border-radius: 999px;
+  //background: rgba(56, 128, 255, 0.08);
+  //color: var(--ion-color-primary);
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.landing-inline-link ion-icon {
+  font-size: 0.95rem;
+}
+
+.landing-inline-link--muted {
+  color: rgba(22, 50, 79, 0.82);
+}
+
+.landing-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: text-bottom;
+  margin: 0 2px;
+}
+
+.landing-inline-icon ion-icon {
+  font-size: 1rem;
 }
 
 .landing-card {
@@ -112,20 +123,16 @@
 }
 
 .landing-card__note {
-  margin: 16px 0 0;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  margin-top: 12px !important;
 }
 
 @media (min-width: 840px) {
   .landing-hero {
-    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
-    align-items: end;
     padding: calc(36px + env(safe-area-inset-top)) 28px 20px;
   }
 
   .landing-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: 8px 24px calc(40px + env(safe-area-inset-bottom));
+    max-width: 920px;
   }
 }
