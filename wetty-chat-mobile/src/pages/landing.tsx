@@ -182,7 +182,9 @@ export default function LandingPage() {
                             <>
                                 <IonCardContent>
                                     <IonText color="medium">
-                                        这点小问题想必难不住你 :)
+                                        <p className="landing-card__note">
+                                            这点小问题想必难不住你 :)
+                                        </p>
                                     </IonText>
                                 </IonCardContent>
                             </>
