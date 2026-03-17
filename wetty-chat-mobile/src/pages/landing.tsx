@@ -7,6 +7,7 @@ import {
     IonPage,
     IonSegment,
     IonSegmentButton,
+    isPlatform,
     IonText,
     IonTitle,
     IonToolbar,
@@ -49,23 +50,27 @@ function IconText({
 }
 
 const detectPlatform = (): PlatformId => {
-    const ua = navigator.userAgent.toLowerCase();
-    const platform = navigator.platform.toLowerCase();
-
-    if (/iphone|ipad|ipod/.test(ua)) {
+    if (isPlatform('ios')) {
         return 'ios';
     }
-    if (/android/.test(ua)) {
+    if (isPlatform('android')) {
         return 'android';
     }
-    if (platform.includes('win')) {
-        return 'windows';
-    }
-    if (platform.includes('mac')) {
-        return 'macos';
-    }
-    if (platform.includes('linux') || /x11/.test(ua)) {
-        return 'linux';
+
+    if (isPlatform('desktop')) {
+        const desktopPlatform =
+            (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform;
+        const normalizedPlatform = desktopPlatform.toLowerCase();
+
+        if (normalizedPlatform.includes('win')) {
+            return 'windows';
+        }
+        if (normalizedPlatform.includes('mac')) {
+            return 'macos';
+        }
+        if (normalizedPlatform.includes('linux') || normalizedPlatform.includes('x11')) {
+            return 'linux';
+        }
     }
 
     return 'android';
