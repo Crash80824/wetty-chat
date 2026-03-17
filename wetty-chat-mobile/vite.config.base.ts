@@ -24,8 +24,8 @@ export default defineConfig({
         name: 'Wetty Chat',
         short_name: 'W Chat',
         description: 'Wetty Chat',
-        theme_color: '#40baf0',
-        background_color: '#ffffff',
+        theme_color: '#f7f7f7',
+        background_color: '#fbf9e9',
         display: 'standalone',
         icons: [
           {
