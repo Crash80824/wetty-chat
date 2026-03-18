@@ -213,7 +213,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
         </IonList>
       )}
       {!loading && !error && (
-        <IonList className={styles.chatsList}>
+        <IonList>
           {chats.length === 0 && (
             <IonItem>
               <IonLabel>
