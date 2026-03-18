@@ -86,6 +86,8 @@ export function VirtualScroll({
   const spacerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
+  const pendingScrollTopRef = useRef(0);
   const isScrollIdleRef = useRef(true);
   const containerHeightRef = useRef(0);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -403,8 +405,14 @@ export function VirtualScroll({
     if (phaseRef.current !== 'READY') return;
     const el = containerRef.current;
     if (!el) return;
-    setScrollTop(el.scrollTop);
-    setContainerHeight(el.clientHeight);
+
+    pendingScrollTopRef.current = el.scrollTop;
+    if (scrollRafRef.current == null) {
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollRafRef.current = null;
+        setScrollTop(pendingScrollTopRef.current);
+      });
+    }
 
     isScrollIdleRef.current = false;
     if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
@@ -454,6 +462,23 @@ export function VirtualScroll({
     });
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scrollIdleTimerRef.current) {
+        clearTimeout(scrollIdleTimerRef.current);
+      }
+      if (scrollRafRef.current != null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+      if (batchTimerRef.current != null) {
+        cancelAnimationFrame(batchTimerRef.current);
+      }
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
+    };
   }, []);
 
   const loadingRowHeight = 36;
