@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::models::{GroupRole, NewGroupMembership};
 use crate::schema::{self, group_membership};
 use crate::utils::auth::CurrentUid;
-use crate::{AppState, AuthMethod};
+use crate::AppState;
 
 #[derive(serde::Deserialize)]
 pub struct ChatIdPath {
@@ -115,36 +115,18 @@ async fn get_members(
 
     use crate::schema::group_membership::dsl as gm_dsl;
 
-    let rows: Vec<(i32, GroupRole, DateTime<Utc>, Option<String>)> = match state.auth_method {
-        AuthMethod::UIDHeader => {
-            use crate::schema::users::dsl as users_dsl;
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
 
-            group_membership::table
-                .left_join(users_dsl::users.on(gm_dsl::uid.eq(users_dsl::uid)))
-                .filter(gm_dsl::chat_id.eq(chat_id))
-                .select((
-                    gm_dsl::uid,
-                    gm_dsl::role,
-                    gm_dsl::joined_at,
-                    users_dsl::username.nullable(),
-                ))
-                .load(conn)
-        }
-        AuthMethod::Discuz => {
-            use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
-
-            group_membership::table
-                .left_join(cm_dsl::common_member.on(gm_dsl::uid.eq(cm_dsl::uid)))
-                .filter(gm_dsl::chat_id.eq(chat_id))
-                .select((
-                    gm_dsl::uid,
-                    gm_dsl::role,
-                    gm_dsl::joined_at,
-                    cm_dsl::username.nullable(),
-                ))
-                .load(conn)
-        }
-    }
+    let rows: Vec<(i32, GroupRole, DateTime<Utc>, Option<String>)> = group_membership::table
+        .left_join(cm_dsl::common_member.on(gm_dsl::uid.eq(cm_dsl::uid)))
+        .filter(gm_dsl::chat_id.eq(chat_id))
+        .select((
+            gm_dsl::uid,
+            gm_dsl::role,
+            gm_dsl::joined_at,
+            cm_dsl::username.nullable(),
+        ))
+        .load(conn)
     .map_err(|e| {
         tracing::error!("list members: {:?}", e);
         (StatusCode::INTERNAL_SERVER_ERROR, "Failed to list members")
@@ -180,9 +162,17 @@ async fn post_add_member(
     // Check if requester is admin
     check_admin_role(conn, chat_id, uid)?;
 
-    // Check if target user exists via lookup_users service
-    let mut names = crate::services::user::lookup_users(&state, &[body.uid]).await;
-    let username = names.remove(&body.uid).flatten();
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+
+    let username = cm_dsl::common_member
+        .filter(cm_dsl::uid.eq(body.uid))
+        .select(cm_dsl::username)
+        .first::<String>(conn)
+        .optional()
+        .map_err(|e| {
+            tracing::error!("load target user: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?;
 
     if username.is_none() {
         return Err((StatusCode::BAD_REQUEST, "User not found"));
@@ -334,9 +324,13 @@ async fn patch_member(
     })?;
 
     // Get updated member info
-    let (role, joined_at): (GroupRole, DateTime<Utc>) = group_membership::table
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+
+    let (role, joined_at, username): (GroupRole, DateTime<Utc>, Option<String>) =
+        group_membership::table
+            .left_join(cm_dsl::common_member.on(gm_dsl::uid.eq(cm_dsl::uid)))
         .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(target_uid)))
-        .select((gm_dsl::role, gm_dsl::joined_at))
+        .select((gm_dsl::role, gm_dsl::joined_at, cm_dsl::username.nullable()))
         .first(conn)
         .map_err(|e| {
             tracing::error!("get updated member: {:?}", e);
@@ -346,13 +340,11 @@ async fn patch_member(
             )
         })?;
 
-    let mut names = crate::services::user::lookup_users(&state, &[target_uid]).await;
-
     Ok(Json(MemberResponse {
         uid: target_uid,
         role,
         joined_at,
-        username: names.remove(&target_uid).flatten(),
+        username,
     }))
 }
 

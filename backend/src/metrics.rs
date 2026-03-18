@@ -19,8 +19,6 @@ pub(crate) struct Metrics {
     ws_connected_users: IntGauge,
     ws_connections_total: IntCounter,
     ws_connection_duration_seconds: Histogram,
-    discuz_username_lookup_duration_seconds: Histogram,
-    discuz_username_lookup_users_total: IntCounter,
     discuz_avatar_lookup_duration_seconds: Histogram,
     discuz_avatar_lookup_fs_duration_seconds: Histogram,
     discuz_avatar_lookup_users_total: IntCounter,
@@ -78,17 +76,6 @@ impl Metrics {
             vec![1.0, 5.0, 15.0, 30.0, 60.0, 300.0, 900.0, 1800.0, 3600.0, 14400.0]
         ))
         .expect("ws_connection_duration_seconds metric should be valid");
-        let discuz_username_lookup_duration_seconds = Histogram::with_opts(histogram_opts!(
-            "discuz_username_lookup_duration_seconds",
-            "Discuz username lookup latency in seconds",
-            vec![0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
-        ))
-        .expect("discuz_username_lookup_duration_seconds metric should be valid");
-        let discuz_username_lookup_users_total = IntCounter::with_opts(opts!(
-            "discuz_username_lookup_users_total",
-            "Total number of requested users processed by Discuz username lookups"
-        ))
-        .expect("discuz_username_lookup_users_total metric should be valid");
         let discuz_avatar_lookup_duration_seconds = Histogram::with_opts(histogram_opts!(
             "discuz_avatar_lookup_duration_seconds",
             "Discuz avatar lookup latency in seconds",
@@ -129,12 +116,6 @@ impl Metrics {
             .register(Box::new(ws_connection_duration_seconds.clone()))
             .expect("ws_connection_duration_seconds registration should succeed");
         registry
-            .register(Box::new(discuz_username_lookup_duration_seconds.clone()))
-            .expect("discuz_username_lookup_duration_seconds registration should succeed");
-        registry
-            .register(Box::new(discuz_username_lookup_users_total.clone()))
-            .expect("discuz_username_lookup_users_total registration should succeed");
-        registry
             .register(Box::new(discuz_avatar_lookup_duration_seconds.clone()))
             .expect("discuz_avatar_lookup_duration_seconds registration should succeed");
         registry
@@ -153,8 +134,6 @@ impl Metrics {
             ws_connected_users,
             ws_connections_total,
             ws_connection_duration_seconds,
-            discuz_username_lookup_duration_seconds,
-            discuz_username_lookup_users_total,
             discuz_avatar_lookup_duration_seconds,
             discuz_avatar_lookup_fs_duration_seconds,
             discuz_avatar_lookup_users_total,
@@ -207,17 +186,6 @@ impl Metrics {
 
     pub(crate) fn record_ws_connection_duration(&self, duration_seconds: f64) {
         self.ws_connection_duration_seconds.observe(duration_seconds);
-    }
-
-    pub(crate) fn record_discuz_username_lookup(
-        &self,
-        requested_users: usize,
-        duration_seconds: f64,
-    ) {
-        self.discuz_username_lookup_duration_seconds
-            .observe(duration_seconds);
-        self.discuz_username_lookup_users_total
-            .inc_by(requested_users as u64);
     }
 
     pub(crate) fn record_discuz_avatar_lookup(
@@ -298,7 +266,6 @@ mod tests {
         metrics.set_ws_connected_users(2);
         metrics.record_ws_connection_open();
         metrics.record_ws_connection_duration(12.0);
-        metrics.record_discuz_username_lookup(2, 0.002);
         metrics.record_discuz_avatar_lookup(2, 0.003, 0.001);
         let app = Router::new()
             .route("/metrics", get(metrics_handler))
@@ -326,8 +293,6 @@ mod tests {
         assert!(body.contains("ws_connected_users"));
         assert!(body.contains("ws_connections_total"));
         assert!(body.contains("ws_connection_duration_seconds"));
-        assert!(body.contains("discuz_username_lookup_duration_seconds"));
-        assert!(body.contains("discuz_username_lookup_users_total"));
         assert!(body.contains("discuz_avatar_lookup_duration_seconds"));
         assert!(body.contains("discuz_avatar_lookup_fs_duration_seconds"));
         assert!(body.contains("discuz_avatar_lookup_users_total"));
@@ -397,7 +362,6 @@ mod tests {
         metrics.set_ws_connected_users(1);
         metrics.record_ws_connection_open();
         metrics.record_ws_connection_duration(30.0);
-        metrics.record_discuz_username_lookup(3, 0.012);
         metrics.record_discuz_avatar_lookup(3, 0.015, 0.006);
 
         let rendered = metrics.render().expect("metrics should render");
@@ -407,8 +371,6 @@ mod tests {
         assert!(rendered.contains("ws_connected_users 1"));
         assert!(rendered.contains("ws_connections_total 1"));
         assert!(rendered.contains("ws_connection_duration_seconds_sum"));
-        assert!(rendered.contains("discuz_username_lookup_duration_seconds_sum"));
-        assert!(rendered.contains("discuz_username_lookup_users_total 3"));
         assert!(rendered.contains("discuz_avatar_lookup_duration_seconds_sum"));
         assert!(rendered.contains("discuz_avatar_lookup_fs_duration_seconds_sum"));
         assert!(rendered.contains("discuz_avatar_lookup_users_total 3"));

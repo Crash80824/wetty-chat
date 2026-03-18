@@ -29,7 +29,6 @@ use crate::{
         groups,
         messages, //
     },
-    services::user::lookup_users,
 };
 use crate::{AppState, MAX_CHATS_LIMIT, MAX_MESSAGES_LIMIT};
 
@@ -291,45 +290,83 @@ pub struct ReplyToMessage {
     is_deleted: bool,
 }
 
+type DbConn = diesel::r2d2::PooledConnection<
+    diesel::r2d2::ConnectionManager<diesel::PgConnection>,
+>;
+
+fn load_username_by_uid(conn: &mut DbConn, uid: i32) -> QueryResult<Option<String>> {
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+
+    cm_dsl::common_member
+        .filter(cm_dsl::uid.eq(uid))
+        .select(cm_dsl::username)
+        .first::<String>(conn)
+        .optional()
+}
+
+fn load_message_usernames(
+    conn: &mut DbConn,
+    message_ids: &[i64],
+) -> QueryResult<std::collections::HashMap<i64, Option<String>>> {
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+
+    if message_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    messages::table
+        .left_join(cm_dsl::common_member.on(messages::sender_uid.eq(cm_dsl::uid)))
+        .filter(messages::id.eq_any(message_ids))
+        .select((messages::id, cm_dsl::username.nullable()))
+        .load::<(i64, Option<String>)>(conn)
+        .map(|rows| rows.into_iter().collect())
+}
+
+fn load_reply_messages(
+    conn: &mut DbConn,
+    reply_ids: &[i64],
+) -> QueryResult<std::collections::HashMap<i64, (Message, Option<String>)>> {
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+
+    if reply_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    messages::table
+        .left_join(cm_dsl::common_member.on(messages::sender_uid.eq(cm_dsl::uid)))
+        .filter(messages::id.eq_any(reply_ids))
+        .select((Message::as_select(), cm_dsl::username.nullable()))
+        .load::<(Message, Option<String>)>(conn)
+        .map(|rows| rows.into_iter().map(|(msg, username)| (msg.id, (msg, username))).collect())
+}
+
 /// Attach reply_to_message to a list of messages by fetching referenced messages in one query.
 pub async fn attach_replies(
-    conn: &mut diesel::r2d2::PooledConnection<
-        diesel::r2d2::ConnectionManager<diesel::PgConnection>,
-    >,
+    conn: &mut DbConn,
     messages_to_process: Vec<Message>,
     state: &AppState,
 ) -> Vec<MessageResponse> {
-    use crate::schema::messages::dsl;
     let reply_ids: Vec<i64> = messages_to_process
         .iter()
         .filter_map(|m| m.reply_to_id)
         .collect();
 
-    let mut uids_to_lookup = std::collections::HashSet::new();
+    let message_ids: Vec<i64> = messages_to_process.iter().map(|m| m.id).collect();
+    let sender_names_by_message_id = load_message_usernames(conn, &message_ids).unwrap_or_default();
+    let reply_messages_map = load_reply_messages(conn, &reply_ids).unwrap_or_default();
+
+    let mut avatar_uids = std::collections::HashSet::new();
     for m in &messages_to_process {
-        uids_to_lookup.insert(m.sender_uid);
+        avatar_uids.insert(m.sender_uid);
     }
-
-    let mut reply_messages_map = std::collections::HashMap::new();
-    if !reply_ids.is_empty() {
-        let reply_messages: Vec<Message> = messages::table
-            .filter(dsl::id.eq_any(&reply_ids))
-            .select(Message::as_select())
-            .load(conn)
-            .unwrap_or_default();
-        for msg in reply_messages {
-            uids_to_lookup.insert(msg.sender_uid);
-            reply_messages_map.insert(msg.id, msg);
-        }
+    for (reply_msg, _) in reply_messages_map.values() {
+        avatar_uids.insert(reply_msg.sender_uid);
     }
-
-    let target_uids: Vec<i32> = uids_to_lookup.into_iter().collect();
-    let user_names = lookup_users(state, &target_uids).await;
+    let target_uids: Vec<i32> = avatar_uids.into_iter().collect();
     let user_avatars = lookup_user_avatars(state, &target_uids);
 
     let mut message_attachments_map: std::collections::HashMap<i64, Vec<Attachment>> =
         std::collections::HashMap::new();
-    let message_ids: Vec<i64> = messages_to_process.iter().map(|m| m.id).collect();
     if !message_ids.is_empty() {
         use crate::schema::attachments::dsl as a_dsl;
         let attachments: Vec<Attachment> = attachments::table
@@ -370,7 +407,7 @@ pub async fn attach_replies(
     let mut responses = Vec::with_capacity(messages_to_process.len());
     for m in messages_to_process {
         let reply_to_message = m.reply_to_id.and_then(|reply_id| {
-            reply_messages_map.get(&reply_id).map(|reply_msg| {
+            reply_messages_map.get(&reply_id).map(|(reply_msg, reply_username)| {
                 Box::new(ReplyToMessage {
                     id: reply_msg.id,
                     message: if reply_msg.deleted_at.is_some() {
@@ -381,7 +418,7 @@ pub async fn attach_replies(
                     sender: Sender {
                         uid: reply_msg.sender_uid,
                         avatar_url: user_avatars.get(&reply_msg.sender_uid).cloned().flatten(),
-                        name: user_names.get(&reply_msg.sender_uid).cloned().flatten(),
+                        name: reply_username.clone(),
                     },
                     is_deleted: reply_msg.deleted_at.is_some(),
                 })
@@ -421,7 +458,7 @@ pub async fn attach_replies(
             sender: Sender {
                 uid: m.sender_uid,
                 avatar_url: user_avatars.get(&m.sender_uid).cloned().flatten(),
-                name: user_names.get(&m.sender_uid).cloned().flatten(),
+                name: sender_names_by_message_id.get(&m.id).cloned().flatten(),
             },
             chat_id: m.chat_id,
             created_at: m.created_at,
@@ -725,11 +762,11 @@ async fn post_message(
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
 
     // Enqueue push notification job (non-blocking; runs in background).
-    let sender_username = lookup_users(&state, &[uid])
-        .await
-        .get(&uid)
-        .cloned()
-        .flatten()
+    let sender_username = load_username_by_uid(conn, uid)
+        .map_err(|e| {
+            tracing::error!("load sender username: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?
         .unwrap_or_else(|| "Someone".to_string());
     let chat_name = groups::table
         .filter(groups::dsl::id.eq(chat_id))
@@ -855,11 +892,11 @@ async fn post_thread_message(
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
 
     // Enqueue push notification job (non-blocking; runs in background).
-    let sender_username = lookup_users(&state, &[uid])
-        .await
-        .get(&uid)
-        .cloned()
-        .flatten()
+    let sender_username = load_username_by_uid(conn, uid)
+        .map_err(|e| {
+            tracing::error!("load sender username: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?
         .unwrap_or_else(|| "Someone".to_string());
     let chat_name = groups::table
         .filter(groups::dsl::id.eq(chat_id))

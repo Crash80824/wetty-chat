@@ -93,14 +93,6 @@ diesel::table! {
     }
 }
 
-diesel::table! {
-    users (uid) {
-        uid -> Int4,
-        #[max_length = 15]
-        username -> Varchar,
-    }
-}
-
 diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
 diesel::joinable!(group_membership -> messages (last_read_message_id));
@@ -111,5 +103,4 @@ diesel::allow_tables_to_appear_in_same_query!(
     groups,
     messages,
     push_subscriptions,
-    users,
 );

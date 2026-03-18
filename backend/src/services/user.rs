@@ -1,5 +1,4 @@
 use crate::{AppState, AuthMethod};
-use diesel::prelude::*;
 use std::collections::HashMap;
 use std::time::Instant;
 use std::time::UNIX_EPOCH;
@@ -41,58 +40,4 @@ pub fn lookup_user_avatars(state: &AppState, uids: &[i32]) -> HashMap<i32, Optio
         fs_duration_seconds,
     );
     map
-}
-
-/// Look up usernames for a list of target UIDs depending on the authentication method.
-pub async fn lookup_users(state: &AppState, uids: &[i32]) -> HashMap<i32, Option<String>> {
-    let mut names = HashMap::with_capacity(uids.len());
-
-    if uids.is_empty() {
-        return names;
-    }
-
-    match state.auth_method {
-        AuthMethod::Discuz => {
-            let start = Instant::now();
-            if let Ok(mut conn) = state.db.get() {
-                use crate::schema::discuz::discuz::common_member::dsl::*;
-
-                let records = common_member
-                    .filter(uid.eq_any(uids))
-                    .select((uid, username))
-                    .load::<(i32, String)>(&mut conn);
-
-                if let Ok(results) = records {
-                    for (found_uid, name) in results {
-                        names.insert(found_uid, Some(name));
-                    }
-                }
-            }
-            state
-                .metrics
-                .record_discuz_username_lookup(uids.len(), start.elapsed().as_secs_f64());
-        }
-        AuthMethod::UIDHeader => {
-            if let Ok(mut conn) = state.db.get() {
-                use crate::schema::users::dsl::*;
-                let records = users
-                    .filter(uid.eq_any(uids))
-                    .select((uid, username))
-                    .load::<(i32, String)>(&mut conn);
-
-                if let Ok(results) = records {
-                    for (found_uid, name) in results {
-                        names.insert(found_uid, Some(name));
-                    }
-                }
-            }
-        }
-    }
-
-    // Fill in missing with None
-    for &id in uids {
-        names.entry(id).or_insert(None);
-    }
-
-    names
 }

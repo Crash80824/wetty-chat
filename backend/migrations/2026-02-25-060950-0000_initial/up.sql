@@ -2,11 +2,6 @@ CREATE TYPE group_visibility AS ENUM ('public', 'semi_public', 'private');
 CREATE TYPE group_role AS ENUM ('member', 'admin');
 CREATE TYPE message_type AS ENUM ('text', 'audio', 'file');
 
-CREATE TABLE users (
-    uid INTEGER PRIMARY KEY NOT NULL,
-    username VARCHAR(15) NOT NULL
-);
-
 CREATE TABLE groups (
     id bigint PRIMARY KEY NOT NULL,
     name VARCHAR(255) NOT NULL,
