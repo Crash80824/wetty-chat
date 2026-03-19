@@ -1,4 +1,5 @@
-//! WebSocket handler: auth via uid query, ping/pong keepalive, connection registry, 300s stale timeout.
+//! WebSocket handler: auth handshake, lifecycle-aware presence updates, ping/pong keepalive,
+//! connection registry, 300s stale timeout.
 
 pub mod messages;
 
@@ -8,7 +9,6 @@ use axum::response::Response;
 use axum::Json;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::time::timeout;
@@ -18,6 +18,7 @@ use crate::services::ws_registry;
 use crate::utils::auth::CurrentUid;
 use crate::AppState;
 use messages::ServerWsMessage;
+use ws_registry::AppPresenceState;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WsClaims {
@@ -69,6 +70,23 @@ struct WsAuthMessage {
 struct WsMessage {
     #[serde(rename = "type")]
     type_: String,
+    state: Option<WsAppState>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum WsAppState {
+    Active,
+    Inactive,
+}
+
+impl From<WsAppState> for AppPresenceState {
+    fn from(value: WsAppState) -> Self {
+        match value {
+            WsAppState::Active => AppPresenceState::Active,
+            WsAppState::Inactive => AppPresenceState::Inactive,
+        }
+    }
 }
 
 const PONG_JSON: &str = r#"{"type":"pong"}"#;
@@ -143,13 +161,29 @@ async fn handle_socket(
                     Some(Ok(Message::Text(text))) => {
                         if let Ok(parsed) = serde_json::from_str::<WsMessage>(&text) {
                             if parsed.type_ == "ping" {
-                                entry
-                                    .last_ping_at
-                                    .store(ws_registry::now_secs(), Ordering::Relaxed);
+                                let state = parsed
+                                    .state
+                                    .map(AppPresenceState::from)
+                                    .unwrap_or(AppPresenceState::Active);
+                                entry.update_ping(state);
+                                registry.refresh_metrics();
                                 trace!("ws ping received uid={} conn_id={}", uid, conn_id);
                                 if socket.send(Message::Text(PONG_JSON.into())).await.is_err() {
                                     break;
                                 }
+                            } else if parsed.type_ == "app_state" {
+                                let state = parsed
+                                    .state
+                                    .map(AppPresenceState::from)
+                                    .unwrap_or(AppPresenceState::Inactive);
+                                entry.update_app_state(state);
+                                registry.refresh_metrics();
+                                trace!(
+                                    "ws app_state received uid={} conn_id={} state={:?}",
+                                    uid,
+                                    conn_id,
+                                    state
+                                );
                             }
                         }
                     }

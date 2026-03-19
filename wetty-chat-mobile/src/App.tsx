@@ -15,12 +15,13 @@ import { Trans } from '@lingui/react/macro';
 import { getCurrentUserId } from './js/current-user';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { t } from '@lingui/core/macro';
-import { syncApp } from '@/api/sync';
 import MobileLayout from './layouts/MobileLayout';
 import { useIsDesktop } from './hooks/useIsDesktop';
+import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { DesktopSplitLayout } from './layouts/DesktopSplitLayout';
 import OobePage from '@/pages/oobe';
 import LandingPage from './pages/landing';
+import { initWebSocket } from '@/api/ws';
 
 setupIonicReact({
   mode: 'ios',
@@ -51,6 +52,7 @@ const App: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const wsConnected = useSelector((state: RootState) => state.connection.wsConnected);
   const isDesktop = useIsDesktop();
+  useAppLifecycle();
 
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -65,30 +67,12 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    initWebSocket();
     if (import.meta.env.DEV) {
       dispatch(setUser({ uid: getCurrentUserId(), username: 'Development User', avatar_url: null }));
     }
     dispatch(fetchCurrentUser());
   }, [dispatch]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        syncApp();
-      }
-    };
-    const handleOnline = () => {
-      syncApp();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
-    };
-  }, []);
 
   return (
     <IonApp>

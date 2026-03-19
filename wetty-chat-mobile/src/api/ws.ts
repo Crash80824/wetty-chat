@@ -1,31 +1,58 @@
-/**
- * WebSocket client: connects to /_api/ws?uid=, sends JSON ping every 10s, handles pong and message delivery.
- * Dispatches incoming messages to the Redux store (add or confirm pending). Same host as REST so Vite proxy works in dev.
- */
-
 import apiClient from '@/api/client';
-import store from '@/store/index';
-import { addMessage, confirmPendingMessage, updateMessageInStore } from '@/store/messagesSlice';
-import { updateChatFromMessage } from '@/store/chatsSlice';
-import { setWsConnected } from '@/store/connectionSlice';
 import { syncApp } from '@/api/sync';
 import type { MessageResponse } from '@/api/messages';
+import { updateChatFromMessage } from '@/store/chatsSlice';
+import { setWsConnected } from '@/store/connectionSlice';
+import store from '@/store/index';
+import {
+  addMessage,
+  confirmPendingMessage,
+  updateMessageInStore,
+} from '@/store/messagesSlice';
 
 const WS_PATH = import.meta.env.BASE_URL + '_api/ws';
 const PING_INTERVAL_MS = 10_000;
-const RECONNECT_DELAY_MS = 5_000;
+const MAX_RECONNECT_DELAY_MS = 30_000;
+const RETRY_BASE_DELAY_MS = 1_000;
+const RETRY_JITTER_RATIO = 0.2;
 
-const PING_JSON = JSON.stringify({ type: 'ping' });
+export type WebSocketAppState = 'active' | 'inactive';
+
+interface ServerEnvelope {
+  type?: string;
+  payload?: unknown;
+}
+
+interface AuthMessage {
+  type: 'auth';
+  ticket: string;
+}
+
+interface PingMessage {
+  type: 'ping';
+  state: WebSocketAppState;
+}
+
+interface AppStateMessage {
+  type: 'app_state';
+  state: WebSocketAppState;
+}
 
 let ws: WebSocket | null = null;
+let pingIntervalId: ReturnType<typeof setInterval> | null = null;
 let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let retryAttempt = 0;
+let isInitialized = false;
+let isConnecting = false;
+let connectGeneration = 0;
+let currentAppState: WebSocketAppState = 'active';
+let networkOnline = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+const intentionalClosures = new WeakSet<WebSocket>();
 
 export async function requestWsTicket(): Promise<string> {
   const res = await apiClient.get<{ ticket: string }>('/ws/ticket');
   return res.data.ticket;
 }
-
-let pingIntervalId: ReturnType<typeof setInterval> | null = null;
 
 function clearPingInterval(): void {
   if (pingIntervalId != null) {
@@ -41,147 +68,276 @@ function clearReconnectTimeout(): void {
   }
 }
 
-function scheduleReconnect(): void {
-  if (reconnectTimeoutId != null) return;
-  reconnectTimeoutId = setTimeout(() => {
-    reconnectTimeoutId = null;
-    initWebSocket();
-  }, RECONNECT_DELAY_MS);
+function getReconnectDelayMs(): number {
+  if (retryAttempt === 0) return 0;
+
+  const exponential = Math.min(
+    RETRY_BASE_DELAY_MS * 2 ** (retryAttempt - 1),
+    MAX_RECONNECT_DELAY_MS,
+  );
+  const jitter = Math.round(exponential * RETRY_JITTER_RATIO * Math.random());
+  return Math.min(exponential + jitter, MAX_RECONNECT_DELAY_MS);
 }
 
-function normalizePayload(p: unknown): MessageResponse | null {
-  if (p == null || typeof p !== 'object') return null;
-  const msg = p as MessageResponse;
-  
+function normalizePayload(payload: unknown): MessageResponse | null {
+  if (payload == null || typeof payload !== 'object') return null;
+  const msg = payload as MessageResponse;
   if (!msg.chat_id || !msg.id) return null;
-  
   return msg;
 }
 
 function allMessagesForChat(chatId: string): MessageResponse[] {
   const chat = store.getState().messages.chats[chatId];
   if (!chat) return [];
-  return chat.windows.flatMap(w => w.messages);
+  return chat.windows.flatMap(window => window.messages);
 }
 
 function handleWsMessage(payload: unknown): void {
   const message = normalizePayload(payload);
   if (!message) return;
+
   const targetChatId = message.reply_root_id
     ? `${message.chat_id}_thread_${message.reply_root_id}`
     : message.chat_id;
   const all = allMessagesForChat(targetChatId);
-  const pending = all.find((m: MessageResponse) => m.client_generated_id === message.client_generated_id && m.id === '0');
+  const pending = all.find(
+    current =>
+      current.client_generated_id === message.client_generated_id && current.id === '0',
+  );
+
   if (pending) {
-    store.dispatch(confirmPendingMessage({
-      chatId: targetChatId,
-      clientGeneratedId: message.client_generated_id,
-      message,
-    }));
+    store.dispatch(
+      confirmPendingMessage({
+        chatId: targetChatId,
+        clientGeneratedId: message.client_generated_id,
+        message,
+      }),
+    );
   } else {
-    const exists = all.some((m: MessageResponse) => m.id === message.id || m.client_generated_id === message.client_generated_id);
+    const exists = all.some(
+      current =>
+        current.id === message.id ||
+        current.client_generated_id === message.client_generated_id,
+    );
     if (!exists) {
       store.dispatch(addMessage({ chatId: targetChatId, message }));
     }
   }
 
-  if (message.chat_id) {
-    store.dispatch(updateChatFromMessage({
+  store.dispatch(
+    updateChatFromMessage({
       chatId: message.chat_id,
       message,
-      currentUserId: store.getState().user.uid || 0
-    }));
+      currentUserId: store.getState().user.uid || 0,
+    }),
+  );
+}
+
+function sendJson(message: AuthMessage | PingMessage | AppStateMessage): void {
+  if (ws?.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify(message));
+}
+
+function publishAppState(): void {
+  sendJson({ type: 'app_state', state: currentAppState });
+}
+
+function closeSocket(socket: WebSocket | null): void {
+  if (socket == null) return;
+  intentionalClosures.add(socket);
+  try {
+    socket.close();
+  } catch {
+    // ignore
   }
 }
 
-export function initWebSocket(): void {
-  if (typeof WebSocket === 'undefined') return;
+function markDisconnected(socket: WebSocket, shouldReconnect: boolean): void {
+  if (intentionalClosures.has(socket)) {
+    intentionalClosures.delete(socket);
+  }
 
-  clearReconnectTimeout();
-  if (ws != null) {
-    try {
-      ws.close();
-    } catch {
-      // ignore
-    }
+  if (ws === socket) {
     ws = null;
   }
 
-  requestWsTicket().then(ticket => {
-    // If we've already scheduled a reconnect while waiting for the ticket, abort
-    if (reconnectTimeoutId != null) return;
+  clearPingInterval();
+  isConnecting = false;
+  store.dispatch(setWsConnected(false));
 
-    const protocol = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (shouldReconnect) {
+    scheduleReconnect();
+  }
+}
+
+function scheduleReconnect(): void {
+  if (!isInitialized) return;
+  if (ws != null || isConnecting) return;
+  if (!networkOnline) {
+    clearReconnectTimeout();
+    return;
+  }
+  if (reconnectTimeoutId != null) return;
+
+  const delay = getReconnectDelayMs();
+  retryAttempt += 1;
+  reconnectTimeoutId = setTimeout(() => {
+    reconnectTimeoutId = null;
+    void connectWebSocket();
+  }, delay);
+}
+
+async function connectWebSocket(): Promise<void> {
+  if (!isInitialized) return;
+  if (typeof WebSocket === 'undefined') return;
+  if (!networkOnline) {
+    store.dispatch(setWsConnected(false));
+    return;
+  }
+  if (ws != null || isConnecting) return;
+
+  isConnecting = true;
+  clearReconnectTimeout();
+  const generation = ++connectGeneration;
+
+  try {
+    const ticket = await requestWsTicket();
+    if (generation !== connectGeneration || !isInitialized || !networkOnline) {
+      isConnecting = false;
+      return;
+    }
+
+    const protocol =
+      typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = typeof location !== 'undefined' ? location.host : 'localhost';
-    const url = `${protocol}//${host}${WS_PATH}`;
-
-    const socket = new WebSocket(url);
+    const socket = new WebSocket(`${protocol}//${host}${WS_PATH}`);
     ws = socket;
 
     socket.onopen = () => {
-      // Send the auth ticket immediately upon connection
-      socket.send(JSON.stringify({ type: 'auth', ticket }));
+      if (generation !== connectGeneration) {
+        closeSocket(socket);
+        return;
+      }
 
-      clearReconnectTimeout();
+      isConnecting = false;
+      retryAttempt = 0;
       store.dispatch(setWsConnected(true));
-      console.log('ws opened');
 
+      sendJson({ type: 'auth', ticket });
+      publishAppState();
       syncApp();
 
+      clearPingInterval();
       pingIntervalId = setInterval(() => {
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(PING_JSON);
-        }
+        sendJson({ type: 'ping', state: currentAppState });
       }, PING_INTERVAL_MS);
     };
 
-    socket.onmessage = (event) => {
+    socket.onmessage = event => {
       if (typeof event.data !== 'string') return;
+
       try {
-        const msg = JSON.parse(event.data) as { type?: string; payload?: unknown };
-        if (msg.type === 'pong') {
-          // Keepalive acknowledged
-        } else if (msg.type === 'message' && msg.payload != null) {
-          handleWsMessage(msg.payload);
-        } else if ((msg.type === 'message_deleted' || msg.type === 'message_updated') && msg.payload != null) {
-          const message = normalizePayload(msg.payload);
-          if (message) {
-            // Update in all chat states that start with this chat's ID (main chat and threads)
-            const state = store.getState();
-            const chatPrefix = `${message.chat_id}`;
-            for (const key of Object.keys(state.messages.chats)) {
-              if (key === chatPrefix || key.startsWith(`${chatPrefix}_thread_`)) {
-                store.dispatch(updateMessageInStore({
+        const message = JSON.parse(event.data) as ServerEnvelope;
+        if (message.type === 'pong') {
+          return;
+        }
+
+        if (message.type === 'message' && message.payload != null) {
+          handleWsMessage(message.payload);
+          return;
+        }
+
+        if (
+          (message.type === 'message_deleted' || message.type === 'message_updated') &&
+          message.payload != null
+        ) {
+          const payload = normalizePayload(message.payload);
+          if (!payload) return;
+
+          const state = store.getState();
+          const chatPrefix = `${payload.chat_id}`;
+          for (const key of Object.keys(state.messages.chats)) {
+            if (key === chatPrefix || key.startsWith(`${chatPrefix}_thread_`)) {
+              store.dispatch(
+                updateMessageInStore({
                   chatId: key,
-                  messageId: message.id,
-                  message,
-                }));
-              }
+                  messageId: payload.id,
+                  message: payload,
+                }),
+              );
             }
           }
         }
       } catch {
-        // ignore non-JSON or invalid messages
+        // ignore malformed websocket messages
       }
     };
 
-    function markDisconnected(): void {
-      if (ws !== socket) return;
-      clearPingInterval();
-      store.dispatch(setWsConnected(false));
-      ws = null;
-      scheduleReconnect();
-    }
-
     socket.onerror = () => {
-      markDisconnected();
+      markDisconnected(socket, !intentionalClosures.has(socket));
     };
 
     socket.onclose = () => {
-      markDisconnected();
+      markDisconnected(socket, !intentionalClosures.has(socket));
     };
-  }).catch(err => {
-    console.error('Failed to get ws ticket:', err);
+  } catch (error) {
+    isConnecting = false;
+    store.dispatch(setWsConnected(false));
+    console.error('Failed to establish websocket:', error);
     scheduleReconnect();
-  });
+  }
+}
+
+function reconnectNow(resetBackoff: boolean): void {
+  if (!isInitialized) return;
+  if (!networkOnline) {
+    store.dispatch(setWsConnected(false));
+    clearReconnectTimeout();
+    return;
+  }
+
+  clearReconnectTimeout();
+  if (resetBackoff) {
+    retryAttempt = 0;
+  }
+  connectGeneration += 1;
+
+  const currentSocket = ws;
+  ws = null;
+  closeSocket(currentSocket);
+  clearPingInterval();
+  isConnecting = false;
+
+  void connectWebSocket();
+}
+
+export function initWebSocket(): void {
+  if (isInitialized) return;
+  isInitialized = true;
+  void connectWebSocket();
+}
+
+export function setWebSocketAppState(state: WebSocketAppState): void {
+  currentAppState = state;
+  publishAppState();
+}
+
+export function handleWebSocketOnline(): void {
+  networkOnline = true;
+  reconnectNow(true);
+}
+
+export function handleWebSocketOffline(): void {
+  networkOnline = false;
+  clearReconnectTimeout();
+  clearPingInterval();
+  closeSocket(ws);
+  ws = null;
+  isConnecting = false;
+  store.dispatch(setWsConnected(false));
+}
+
+export function ensureWebSocketConnected(resetBackoff = false): void {
+  if (ws != null || isConnecting) return;
+  reconnectNow(resetBackoff);
 }

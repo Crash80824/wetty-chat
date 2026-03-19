@@ -1,11 +1,28 @@
-//! WebSocket connection registry: maps user id to active connections, supports broadcast and stale-connection pruning.
+//! WebSocket connection registry: maps user id to active connections, tracks app presence,
+//! supports broadcast and stale-connection pruning.
 
 use crate::handlers::ws::messages::ServerWsMessage;
 use crate::metrics::Metrics;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum AppPresenceState {
+    Active = 1,
+    Inactive = 2,
+}
+
+impl AppPresenceState {
+    fn from_u8(value: u8) -> Self {
+        match value {
+            x if x == Self::Inactive as u8 => Self::Inactive,
+            _ => Self::Active,
+        }
+    }
+}
 
 /// Per-connection state: sender to push messages to the socket task, last ping time for timeout.
 #[derive(Debug)]
@@ -14,6 +31,28 @@ pub struct ConnectionEntry {
     pub tx: mpsc::Sender<Arc<ServerWsMessage>>,
     /// Unix timestamp (seconds) when we last received a ping from the client.
     pub last_ping_at: AtomicU64,
+    pub app_state: AtomicU8,
+    pub last_state_at: AtomicU64,
+}
+
+impl ConnectionEntry {
+    pub fn update_ping(&self, state: AppPresenceState) {
+        let now = now_secs();
+        self.last_ping_at.store(now, Ordering::Relaxed);
+        self.app_state.store(state as u8, Ordering::Relaxed);
+        self.last_state_at.store(now, Ordering::Relaxed);
+    }
+
+    pub fn update_app_state(&self, state: AppPresenceState) {
+        let now = now_secs();
+        self.last_ping_at.store(now, Ordering::Relaxed);
+        self.app_state.store(state as u8, Ordering::Relaxed);
+        self.last_state_at.store(now, Ordering::Relaxed);
+    }
+
+    pub fn app_state(&self) -> AppPresenceState {
+        AppPresenceState::from_u8(self.app_state.load(Ordering::Relaxed))
+    }
 }
 
 static NEXT_CONN_ID: AtomicU64 = AtomicU64::new(0);
@@ -46,7 +85,10 @@ impl ConnectionRegistry {
 
     /// Register a new connection for the given user. Returns the entry (to update last_ping_at)
     /// and the receiver for the send task. Caller must call `remove_connection(uid, conn_id)` when the socket closes.
-    pub fn register(&self, uid: i32) -> (Arc<ConnectionEntry>, mpsc::Receiver<Arc<ServerWsMessage>>) {
+    pub fn register(
+        &self,
+        uid: i32,
+    ) -> (Arc<ConnectionEntry>, mpsc::Receiver<Arc<ServerWsMessage>>) {
         let conn_id = next_conn_id();
         let (tx, rx) = mpsc::channel(256);
         let now = now_secs();
@@ -54,10 +96,12 @@ impl ConnectionRegistry {
             conn_id,
             tx,
             last_ping_at: AtomicU64::new(now),
+            app_state: AtomicU8::new(AppPresenceState::Active as u8),
+            last_state_at: AtomicU64::new(now),
         });
         self.inner.entry(uid).or_default().push(entry.clone());
         self.metrics.record_ws_connection_open();
-        self.metrics.set_ws_connected_users(self.inner.len());
+        self.update_metrics();
         (entry, rx)
     }
 
@@ -71,7 +115,7 @@ impl ConnectionRegistry {
         if empty {
             self.inner.remove(&uid);
         }
-        self.metrics.set_ws_connected_users(self.inner.len());
+        self.update_metrics();
     }
 
     /// Broadcast a JSON string to all connections for the given user ids. Each uid may have multiple connections.
@@ -92,12 +136,15 @@ impl ConnectionRegistry {
         }
     }
 
-    /// Check if a user has at least one active WebSocket connection.
-    pub fn has_active_connections(&self, uid: i32) -> bool {
-        self.inner
-            .get(&uid)
-            .map(|vec| !vec.is_empty())
-            .unwrap_or(false)
+    /// Returns true when at least one fresh connection is actively viewing the app.
+    pub fn should_suppress_push(&self, uid: i32, freshness_secs: u64) -> bool {
+        let now = now_secs();
+        self.inner.get(&uid).map_or(false, |vec| {
+            vec.iter().any(|entry| {
+                now.saturating_sub(entry.last_ping_at.load(Ordering::Relaxed)) <= freshness_secs
+                    && entry.app_state() == AppPresenceState::Active
+            })
+        })
     }
 
     /// Remove connections that have not sent a ping in more than `max_age` seconds.
@@ -127,12 +174,84 @@ impl ConnectionRegistry {
                 }
             }
         }
+        self.update_metrics();
+    }
+
+    pub fn refresh_metrics(&self) {
+        self.update_metrics();
+    }
+
+    fn update_metrics(&self) {
+        let mut active_connections = 0usize;
+        let mut inactive_connections = 0usize;
+
+        for ref_entry in self.inner.iter() {
+            for entry in ref_entry.iter() {
+                match entry.app_state() {
+                    AppPresenceState::Active => active_connections += 1,
+                    AppPresenceState::Inactive => inactive_connections += 1,
+                }
+            }
+        }
+
         self.metrics.set_ws_connected_users(self.inner.len());
+        self.metrics
+            .set_ws_connection_states(active_connections, inactive_connections);
     }
 }
 
 impl Default for ConnectionRegistry {
     fn default() -> Self {
         Self::new(Arc::new(Metrics::new()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn registry() -> ConnectionRegistry {
+        ConnectionRegistry::new(Arc::new(Metrics::new()))
+    }
+
+    #[test]
+    fn suppresses_push_for_fresh_active_connection() {
+        let registry = registry();
+        let (entry, _rx) = registry.register(7);
+        entry.update_ping(AppPresenceState::Active);
+
+        assert!(registry.should_suppress_push(7, 30));
+    }
+
+    #[test]
+    fn does_not_suppress_push_for_inactive_connection() {
+        let registry = registry();
+        let (entry, _rx) = registry.register(7);
+        entry.update_app_state(AppPresenceState::Inactive);
+
+        assert!(!registry.should_suppress_push(7, 30));
+    }
+
+    #[test]
+    fn does_not_suppress_push_for_stale_connection() {
+        let registry = registry();
+        let (entry, _rx) = registry.register(7);
+        entry.update_ping(AppPresenceState::Active);
+        entry
+            .last_ping_at
+            .store(now_secs().saturating_sub(31), Ordering::Relaxed);
+
+        assert!(!registry.should_suppress_push(7, 30));
+    }
+
+    #[test]
+    fn suppresses_push_when_any_connection_is_active() {
+        let registry = registry();
+        let (inactive_entry, _rx1) = registry.register(7);
+        inactive_entry.update_app_state(AppPresenceState::Inactive);
+        let (active_entry, _rx2) = registry.register(7);
+        active_entry.update_ping(AppPresenceState::Active);
+
+        assert!(registry.should_suppress_push(7, 30));
     }
 }

@@ -7,10 +7,10 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 use web_push::{HyperWebPushClient, WebPushClient};
 
+use crate::metrics::Metrics;
 use crate::models::PushSubscription;
 use crate::schema::push_subscriptions;
 use crate::services::ws_registry::ConnectionRegistry;
-use crate::metrics::Metrics;
 
 /// Maximum characters kept in the push notification body preview.
 const MESSAGE_PREVIEW_MAX: usize = 100;
@@ -20,6 +20,7 @@ const PUSH_CONCURRENCY: usize = 10;
 
 /// Channel buffer size for pending push jobs.
 const CHANNEL_BUFFER: usize = 1024;
+const PUSH_SUPPRESSION_FRESHNESS_SECS: u64 = 30;
 
 /// A push notification job enqueued when a new message is created.
 #[derive(Debug, Clone)]
@@ -209,11 +210,17 @@ async fn process_push_job(
         .load(&mut conn)
         .map_err(|e| format!("Failed to load member UIDs: {:?}", e))?;
 
-    // 2. Filter out the sender and users with active WS connections.
+    // 2. Filter out the sender and users with fresh active app presence.
     let target_uids: Vec<i32> = member_uids
         .into_iter()
         .filter(|&uid| uid != job.sender_uid)
-        .filter(|&uid| !ws_registry.has_active_connections(uid))
+        .filter(|&uid| {
+            let suppress = ws_registry.should_suppress_push(uid, PUSH_SUPPRESSION_FRESHNESS_SECS);
+            if suppress {
+                service.metrics.record_push_suppressed();
+            }
+            !suppress
+        })
         .collect();
 
     if target_uids.is_empty() {
@@ -269,7 +276,7 @@ async fn process_push_job(
     let stale_endpoints: Vec<String> = stream::iter(subs.into_iter())
         .map(|sub| {
             let service = service.clone();
-            
+
             let unread = unread_counts.get(&sub.user_id).copied().unwrap_or(0);
             let payload = serde_json::to_vec(&serde_json::json!({
                 "type": "new_message",

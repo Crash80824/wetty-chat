@@ -20,10 +20,8 @@ import { I18nProvider } from '@lingui/react';
 import { i18n, activateDetectedLocale } from '@/i18n';
 import store from '@/store/index';
 import App from './App';
-import { initWebSocket } from '@/api/ws';
 import { setupIonicReact } from '@ionic/react';
 
-initWebSocket();
 activateDetectedLocale();
 setupIonicReact({
   mode: 'ios',

@@ -5,7 +5,7 @@ export interface ConnectionState {
 }
 
 const initialState: ConnectionState = {
-  wsConnected: true,
+  wsConnected: false,
 };
 
 const connectionSlice = createSlice({

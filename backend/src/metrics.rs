@@ -16,7 +16,10 @@ pub(crate) struct Metrics {
     http_request_duration_seconds: HistogramVec,
     messages_total: IntCounterVec,
     push_notifications_total: IntCounterVec,
+    push_notifications_suppressed_total: IntCounter,
     ws_connected_users: IntGauge,
+    ws_active_connections: IntGauge,
+    ws_inactive_connections: IntGauge,
     ws_connections_total: IntCounter,
     ws_connection_duration_seconds: Histogram,
     discuz_avatar_lookup_duration_seconds: Histogram,
@@ -60,11 +63,26 @@ impl Metrics {
             &["result"],
         )
         .expect("push_notifications_total metric should be valid");
+        let push_notifications_suppressed_total = IntCounter::with_opts(opts!(
+            "push_notifications_suppressed_total",
+            "Total number of push notifications skipped because a user had active websocket presence"
+        ))
+        .expect("push_notifications_suppressed_total metric should be valid");
         let ws_connected_users = IntGauge::with_opts(opts!(
             "ws_connected_users",
             "Current number of users with at least one active websocket connection"
         ))
         .expect("ws_connected_users metric should be valid");
+        let ws_active_connections = IntGauge::with_opts(opts!(
+            "ws_active_connections",
+            "Current number of websocket connections reporting active app presence"
+        ))
+        .expect("ws_active_connections metric should be valid");
+        let ws_inactive_connections = IntGauge::with_opts(opts!(
+            "ws_inactive_connections",
+            "Current number of websocket connections reporting inactive app presence"
+        ))
+        .expect("ws_inactive_connections metric should be valid");
         let ws_connections_total = IntCounter::with_opts(opts!(
             "ws_connections_total",
             "Total number of successfully established websocket connections"
@@ -107,8 +125,17 @@ impl Metrics {
             .register(Box::new(push_notifications_total.clone()))
             .expect("push_notifications_total registration should succeed");
         registry
+            .register(Box::new(push_notifications_suppressed_total.clone()))
+            .expect("push_notifications_suppressed_total registration should succeed");
+        registry
             .register(Box::new(ws_connected_users.clone()))
             .expect("ws_connected_users registration should succeed");
+        registry
+            .register(Box::new(ws_active_connections.clone()))
+            .expect("ws_active_connections registration should succeed");
+        registry
+            .register(Box::new(ws_inactive_connections.clone()))
+            .expect("ws_inactive_connections registration should succeed");
         registry
             .register(Box::new(ws_connections_total.clone()))
             .expect("ws_connections_total registration should succeed");
@@ -131,7 +158,10 @@ impl Metrics {
             http_request_duration_seconds,
             messages_total,
             push_notifications_total,
+            push_notifications_suppressed_total,
             ws_connected_users,
+            ws_active_connections,
+            ws_inactive_connections,
             ws_connections_total,
             ws_connection_duration_seconds,
             discuz_avatar_lookup_duration_seconds,
@@ -180,12 +210,27 @@ impl Metrics {
         self.ws_connected_users.set(connected_users as i64);
     }
 
+    pub(crate) fn set_ws_connection_states(
+        &self,
+        active_connections: usize,
+        inactive_connections: usize,
+    ) {
+        self.ws_active_connections.set(active_connections as i64);
+        self.ws_inactive_connections
+            .set(inactive_connections as i64);
+    }
+
+    pub(crate) fn record_push_suppressed(&self) {
+        self.push_notifications_suppressed_total.inc();
+    }
+
     pub(crate) fn record_ws_connection_open(&self) {
         self.ws_connections_total.inc();
     }
 
     pub(crate) fn record_ws_connection_duration(&self, duration_seconds: f64) {
-        self.ws_connection_duration_seconds.observe(duration_seconds);
+        self.ws_connection_duration_seconds
+            .observe(duration_seconds);
     }
 
     pub(crate) fn record_discuz_avatar_lookup(
@@ -209,11 +254,21 @@ pub(crate) async fn track_http_metrics(
     next: Next,
 ) -> Response {
     let method = request.method().as_str().to_string();
-    let route = route_label(request.extensions().get::<MatchedPath>().map(MatchedPath::as_str));
+    let route = route_label(
+        request
+            .extensions()
+            .get::<MatchedPath>()
+            .map(MatchedPath::as_str),
+    );
     let start = Instant::now();
 
     let response = next.run(request).await;
-    metrics.record_http(&method, &route, response.status(), start.elapsed().as_secs_f64());
+    metrics.record_http(
+        &method,
+        &route,
+        response.status(),
+        start.elapsed().as_secs_f64(),
+    );
 
     response
 }
@@ -221,7 +276,9 @@ pub(crate) async fn track_http_metrics(
 pub(crate) async fn metrics_handler(
     State(metrics): State<Arc<Metrics>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let body = metrics.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let body = metrics
+        .render()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let encoder = TextEncoder::new();
     let mut response = body.into_response();
     response.headers_mut().insert(
@@ -263,7 +320,9 @@ mod tests {
         metrics.record_http("GET", "/seed", StatusCode::OK, 0.001);
         metrics.record_message(42);
         metrics.record_push_notification(true);
+        metrics.record_push_suppressed();
         metrics.set_ws_connected_users(2);
+        metrics.set_ws_connection_states(1, 1);
         metrics.record_ws_connection_open();
         metrics.record_ws_connection_duration(12.0);
         metrics.record_discuz_avatar_lookup(2, 0.003, 0.001);
@@ -290,7 +349,10 @@ mod tests {
         assert!(body.contains("http_request_duration_seconds"));
         assert!(body.contains("messages_total"));
         assert!(body.contains("push_notifications_total"));
+        assert!(body.contains("push_notifications_suppressed_total"));
         assert!(body.contains("ws_connected_users"));
+        assert!(body.contains("ws_active_connections"));
+        assert!(body.contains("ws_inactive_connections"));
         assert!(body.contains("ws_connections_total"));
         assert!(body.contains("ws_connection_duration_seconds"));
         assert!(body.contains("discuz_avatar_lookup_duration_seconds"));
@@ -301,12 +363,9 @@ mod tests {
     #[tokio::test]
     async fn http_metrics_count_requests_by_matched_route() {
         let metrics = Arc::new(Metrics::new());
-        let app = Router::new()
-            .route("/items/{id}", get(ok_handler))
-            .layer(middleware::from_fn_with_state(
-                metrics.clone(),
-                track_http_metrics,
-            ));
+        let app = Router::new().route("/items/{id}", get(ok_handler)).layer(
+            middleware::from_fn_with_state(metrics.clone(), track_http_metrics),
+        );
 
         let response = app
             .oneshot(
@@ -329,12 +388,13 @@ mod tests {
     #[tokio::test]
     async fn http_metrics_record_unknown_for_unmatched_requests() {
         let metrics = Arc::new(Metrics::new());
-        let app = Router::new()
-            .fallback(get(not_found_handler))
-            .layer(middleware::from_fn_with_state(
-                metrics.clone(),
-                track_http_metrics,
-            ));
+        let app =
+            Router::new()
+                .fallback(get(not_found_handler))
+                .layer(middleware::from_fn_with_state(
+                    metrics.clone(),
+                    track_http_metrics,
+                ));
 
         let response = app
             .oneshot(
@@ -359,7 +419,9 @@ mod tests {
         metrics.record_message(123);
         metrics.record_push_notification(true);
         metrics.record_push_notification(false);
+        metrics.record_push_suppressed();
         metrics.set_ws_connected_users(1);
+        metrics.set_ws_connection_states(1, 0);
         metrics.record_ws_connection_open();
         metrics.record_ws_connection_duration(30.0);
         metrics.record_discuz_avatar_lookup(3, 0.015, 0.006);
@@ -368,7 +430,10 @@ mod tests {
         assert!(rendered.contains("messages_total{chat_id=\"123\"} 1"));
         assert!(rendered.contains("push_notifications_total{result=\"success\"} 1"));
         assert!(rendered.contains("push_notifications_total{result=\"failure\"} 1"));
+        assert!(rendered.contains("push_notifications_suppressed_total 1"));
         assert!(rendered.contains("ws_connected_users 1"));
+        assert!(rendered.contains("ws_active_connections 1"));
+        assert!(rendered.contains("ws_inactive_connections 0"));
         assert!(rendered.contains("ws_connections_total 1"));
         assert!(rendered.contains("ws_connection_duration_seconds_sum"));
         assert!(rendered.contains("discuz_avatar_lookup_duration_seconds_sum"));
