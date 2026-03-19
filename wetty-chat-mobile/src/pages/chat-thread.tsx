@@ -4,6 +4,7 @@ import {
   IonHeader,
   IonToolbar,
   IonTitle,
+  IonProgressBar,
   IonContent,
   IonFooter,
   IonButtons,
@@ -70,6 +71,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const currentUserId = useSelector((state: RootState) => state.user.uid);
   const currentUserName = useSelector((state: RootState) => state.user.username);
   const currentUserAvatarUrl = useSelector((state: RootState) => state.user.avatar_url);
+  const wsConnected = useSelector((state: RootState) => state.connection.wsConnected);
   const storedName = useSelector((state: RootState) => selectChatName(state, chatId));
   const chatName = threadId ? t`Thread` : (storedName ?? t`Loading...`);
 
@@ -445,6 +447,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
               </IonButton>
             </FeatureGate>
           </IonButtons>
+          {!wsConnected && <IonProgressBar type="indeterminate" />}
         </IonToolbar>
       </IonHeader>
 

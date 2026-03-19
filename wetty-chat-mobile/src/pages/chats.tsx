@@ -1,9 +1,10 @@
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonButtons, IonButton, IonIcon } from '@ionic/react';
 import { Trans } from '@lingui/react/macro';
 import { useHistory } from 'react-router-dom';
 import { createOutline } from 'ionicons/icons';
 import { ChatList } from '@/components/chat/ChatList';
 import { FeatureGate } from '@/components/FeatureGate';
+import { TitleWithConnectionStatus } from '@/components/TitleWithConnectionStatus';
 
 export default function Chats() {
   const history = useHistory();
@@ -12,7 +13,9 @@ export default function Chats() {
     <IonPage className="chats-page">
       <IonHeader>
         <IonToolbar>
-          <IonTitle><Trans>Chats</Trans></IonTitle>
+          <TitleWithConnectionStatus>
+            <Trans>Chats</Trans>
+          </TitleWithConnectionStatus>
           <IonButtons slot="end">
             <FeatureGate>
               <IonButton routerLink="/chats/new">

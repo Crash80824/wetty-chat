@@ -5,13 +5,12 @@ import {
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Redirect, useRouteMatch } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { useEffect } from 'react';
-import type { AppDispatch, RootState } from '@/store/index';
+import type { AppDispatch } from '@/store/index';
 import { fetchCurrentUser, setUser } from '@/store/userSlice';
 
 import './app.scss';
-import { Trans } from '@lingui/react/macro';
 import { getCurrentUserId } from './js/current-user';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { t } from '@lingui/core/macro';
@@ -50,7 +49,6 @@ function AppRouter({ isDesktop }: { isDesktop: boolean }) {
 
 const App: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const wsConnected = useSelector((state: RootState) => state.connection.wsConnected);
   const isDesktop = useIsDesktop();
   useAppLifecycle();
 
@@ -94,11 +92,6 @@ const App: React.FC = () => {
           }
         ]}
       />
-      {!wsConnected && (
-        <div className="ws-disconnected-banner" role="status" aria-live="polite">
-          <Trans>Disconnected. Retrying…</Trans>
-        </div>
-      )}
       <div className="app-router-shell">
         <IonReactRouter basename={import.meta.env.BASE_URL}>
           <AppRouter isDesktop={isDesktop} />
