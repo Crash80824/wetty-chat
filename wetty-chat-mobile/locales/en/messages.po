@@ -13,9 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/components/chat/ChatList.tsx
 #: src/pages/chat-thread.tsx
 #: src/pages/chat-thread.tsx
-#: src/pages/chats.tsx
 msgid "[Deleted]"
 msgstr "[Deleted]"
 
@@ -59,11 +59,12 @@ msgid "Cancel"
 msgstr "Cancel"
 
 #. placeholder {0}: chat.id
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Chat {0}"
 msgstr "Chat {0}"
 
-#: src/App.tsx
+#: src/layouts/DesktopSplitLayout.tsx
+#: src/layouts/MobileLayout.tsx
 #: src/pages/chats.tsx
 msgid "Chats"
 msgstr "Chats"
@@ -133,7 +134,7 @@ msgstr "Enter group name"
 msgid "Enter user ID to add:"
 msgstr "Enter user ID to add:"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Error"
 msgstr "Error"
 
@@ -161,7 +162,7 @@ msgstr "Failed to jump to message"
 msgid "Failed to load chat details"
 msgstr "Failed to load chat details"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Failed to load chats"
 msgstr "Failed to load chats"
 
@@ -181,7 +182,7 @@ msgstr "Failed to load more"
 msgid "Failed to load newer messages"
 msgstr "Failed to load newer messages"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Failed to refresh chats"
 msgstr "Failed to refresh chats"
 
@@ -242,7 +243,7 @@ msgstr "Language"
 msgid "Loading..."
 msgstr "Loading..."
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Loading…"
 msgstr "Loading…"
 
@@ -266,15 +267,15 @@ msgstr "Member removed"
 msgid "Message cannot be empty"
 msgstr "Message cannot be empty"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "New message"
 msgstr "New message"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "No chats yet"
 msgstr "No chats yet"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "No messages yet"
 msgstr "No messages yet"
 
@@ -306,7 +307,7 @@ msgstr "Promote to Admin"
 msgid "Public"
 msgstr "Public"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Read"
 msgstr "Read"
 
@@ -347,7 +348,11 @@ msgstr "Save Settings"
 msgid "Saving..."
 msgstr "Saving..."
 
-#: src/App.tsx
+#: src/layouts/DesktopSplitLayout.tsx
+msgid "Select a chat"
+msgstr "Select a chat"
+
+#: src/layouts/MobileLayout.tsx
 #: src/pages/settings.tsx
 msgid "Settings"
 msgstr "Settings"
@@ -360,7 +365,7 @@ msgstr "Settings saved"
 msgid "Start Thread"
 msgstr "Start Thread"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Text message"
 msgstr "Text message"
 
@@ -372,7 +377,7 @@ msgstr "Thread"
 msgid "Today"
 msgstr "Today"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Unread"
 msgstr "Unread"
 

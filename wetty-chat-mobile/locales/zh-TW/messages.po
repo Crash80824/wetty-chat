@@ -13,9 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/components/chat/ChatList.tsx
 #: src/pages/chat-thread.tsx
 #: src/pages/chat-thread.tsx
-#: src/pages/chats.tsx
 msgid "[Deleted]"
 msgstr "[已刪除]"
 
@@ -59,11 +59,12 @@ msgid "Cancel"
 msgstr "取消"
 
 #. placeholder {0}: chat.id
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Chat {0}"
 msgstr "聊天 {0}"
 
-#: src/App.tsx
+#: src/layouts/DesktopSplitLayout.tsx
+#: src/layouts/MobileLayout.tsx
 #: src/pages/chats.tsx
 msgid "Chats"
 msgstr "聊天"
@@ -133,7 +134,7 @@ msgstr "輸入群組名稱"
 msgid "Enter user ID to add:"
 msgstr "輸入要新增的使用者 ID："
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Error"
 msgstr "錯誤"
 
@@ -161,7 +162,7 @@ msgstr "跳轉到訊息失敗"
 msgid "Failed to load chat details"
 msgstr "載入聊天詳情失敗"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Failed to load chats"
 msgstr "載入聊天失敗"
 
@@ -181,7 +182,7 @@ msgstr "載入更多失敗"
 msgid "Failed to load newer messages"
 msgstr "載入新訊息失敗"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Failed to refresh chats"
 msgstr "重新整理聊天失敗"
 
@@ -242,7 +243,7 @@ msgstr "語言"
 msgid "Loading..."
 msgstr "正在載入..."
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Loading…"
 msgstr "正在載入…"
 
@@ -266,15 +267,15 @@ msgstr "成員已移除"
 msgid "Message cannot be empty"
 msgstr "訊息不能為空"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "New message"
 msgstr "新訊息"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "No chats yet"
 msgstr "暫無聊天"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "No messages yet"
 msgstr "暫無訊息"
 
@@ -306,7 +307,7 @@ msgstr "升級為管理員"
 msgid "Public"
 msgstr "公開"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Read"
 msgstr "標記已讀"
 
@@ -347,7 +348,11 @@ msgstr "儲存設定"
 msgid "Saving..."
 msgstr "儲存中..."
 
-#: src/App.tsx
+#: src/layouts/DesktopSplitLayout.tsx
+msgid "Select a chat"
+msgstr "選擇一個聊天"
+
+#: src/layouts/MobileLayout.tsx
 #: src/pages/settings.tsx
 msgid "Settings"
 msgstr "設定"
@@ -360,7 +365,7 @@ msgstr "設定已儲存"
 msgid "Start Thread"
 msgstr "開始話題"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Text message"
 msgstr "文字訊息"
 
@@ -372,7 +377,7 @@ msgstr "話題"
 msgid "Today"
 msgstr "今天"
 
-#: src/pages/chats.tsx
+#: src/components/chat/ChatList.tsx
 msgid "Unread"
 msgstr "標記未讀"
 
