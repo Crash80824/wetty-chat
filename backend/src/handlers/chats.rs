@@ -82,7 +82,9 @@ async fn get_chats(
     })?;
 
     let unread_count_sq = diesel::dsl::sql::<diesel::sql_types::BigInt>(
-        "(SELECT count(*) FROM messages
+        "(SELECT count(*) FROM (
+            SELECT 1
+            FROM messages
             WHERE
                 chat_id = groups.id
             AND
@@ -90,7 +92,9 @@ async fn get_chats(
             AND
                 deleted_at IS NULL
             AND
-                id > COALESCE(group_membership.last_read_message_id, 0))",
+                id > COALESCE(group_membership.last_read_message_id, 0)
+            LIMIT 100
+        ) AS unread_messages)",
     );
 
     let base_query = groups::table
@@ -149,39 +153,57 @@ async fn get_chats(
             };
             let cursor_id = after_id;
 
-            let default_time_str = "1970-01-01T00:00:00Z";
-            let default_time = default_time_str.parse::<DateTime<Utc>>().unwrap();
-            let c_at = cursor_at.unwrap_or(default_time);
-
-            base_query
-                .select((
-                    groups::id,
-                    groups::name,
-                    groups::last_message_at,
-                    unread_count_sq.clone(),
-                    messages::all_columns.nullable(),
-                ))
-                .filter(
-                    diesel::dsl::sql::<diesel::sql_types::Timestamptz>(
-                        "COALESCE(groups.last_message_at, '1970-01-01'::timestamptz)",
+            match cursor_at {
+                Some(c_at) => base_query
+                    .select((
+                        groups::id,
+                        groups::name,
+                        groups::last_message_at,
+                        unread_count_sq.clone(),
+                        messages::all_columns.nullable(),
+                    ))
+                    .filter(
+                        groups::last_message_at
+                            .lt(c_at)
+                            .or(groups::last_message_at
+                                .eq(c_at)
+                                .and(groups::id.lt(cursor_id)))
+                            .or(groups::last_message_at.is_null()),
                     )
-                    .lt(c_at)
-                    .or(diesel::dsl::sql::<diesel::sql_types::Timestamptz>(
-                        "COALESCE(groups.last_message_at, '1970-01-01'::timestamptz)",
+                    .order_by((
+                        groups::last_message_at.desc().nulls_last(),
+                        groups::id.desc(),
+                    ))
+                    .limit(limit + 1)
+                    .load(conn)
+                    .map_err(|e| {
+                        tracing::error!("list chats after: {:?}", e);
+                        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to list chats")
+                    })?,
+                None => base_query
+                    .select((
+                        groups::id,
+                        groups::name,
+                        groups::last_message_at,
+                        unread_count_sq.clone(),
+                        messages::all_columns.nullable(),
+                    ))
+                    .filter(
+                        groups::last_message_at
+                            .is_null()
+                            .and(groups::id.lt(cursor_id)),
                     )
-                    .eq(c_at)
-                    .and(groups::id.lt(cursor_id))),
-                )
-                .order_by((
-                    groups::last_message_at.desc().nulls_last(),
-                    groups::id.desc(),
-                ))
-                .limit(limit + 1)
-                .load(conn)
-                .map_err(|e| {
-                    tracing::error!("list chats after: {:?}", e);
-                    (StatusCode::INTERNAL_SERVER_ERROR, "Failed to list chats")
-                })?
+                    .order_by((
+                        groups::last_message_at.desc().nulls_last(),
+                        groups::id.desc(),
+                    ))
+                    .limit(limit + 1)
+                    .load(conn)
+                    .map_err(|e| {
+                        tracing::error!("list chats after: {:?}", e);
+                        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to list chats")
+                    })?,
+            }
         }
     };
 
@@ -290,9 +312,7 @@ pub struct ReplyToMessage {
     is_deleted: bool,
 }
 
-type DbConn = diesel::r2d2::PooledConnection<
-    diesel::r2d2::ConnectionManager<diesel::PgConnection>,
->;
+type DbConn = diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 
 fn load_username_by_uid(conn: &mut DbConn, uid: i32) -> QueryResult<Option<String>> {
     use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
@@ -337,7 +357,11 @@ fn load_reply_messages(
         .filter(messages::id.eq_any(reply_ids))
         .select((Message::as_select(), cm_dsl::username.nullable()))
         .load::<(Message, Option<String>)>(conn)
-        .map(|rows| rows.into_iter().map(|(msg, username)| (msg.id, (msg, username))).collect())
+        .map(|rows| {
+            rows.into_iter()
+                .map(|(msg, username)| (msg.id, (msg, username)))
+                .collect()
+        })
 }
 
 /// Attach reply_to_message to a list of messages by fetching referenced messages in one query.
@@ -407,22 +431,24 @@ pub async fn attach_replies(
     let mut responses = Vec::with_capacity(messages_to_process.len());
     for m in messages_to_process {
         let reply_to_message = m.reply_to_id.and_then(|reply_id| {
-            reply_messages_map.get(&reply_id).map(|(reply_msg, reply_username)| {
-                Box::new(ReplyToMessage {
-                    id: reply_msg.id,
-                    message: if reply_msg.deleted_at.is_some() {
-                        None
-                    } else {
-                        reply_msg.message.clone()
-                    },
-                    sender: Sender {
-                        uid: reply_msg.sender_uid,
-                        avatar_url: user_avatars.get(&reply_msg.sender_uid).cloned().flatten(),
-                        name: reply_username.clone(),
-                    },
-                    is_deleted: reply_msg.deleted_at.is_some(),
+            reply_messages_map
+                .get(&reply_id)
+                .map(|(reply_msg, reply_username)| {
+                    Box::new(ReplyToMessage {
+                        id: reply_msg.id,
+                        message: if reply_msg.deleted_at.is_some() {
+                            None
+                        } else {
+                            reply_msg.message.clone()
+                        },
+                        sender: Sender {
+                            uid: reply_msg.sender_uid,
+                            avatar_url: user_avatars.get(&reply_msg.sender_uid).cloned().flatten(),
+                            name: reply_username.clone(),
+                        },
+                        is_deleted: reply_msg.deleted_at.is_some(),
+                    })
                 })
-            })
         });
 
         let mut attachments = Vec::new();
@@ -758,7 +784,9 @@ async fn post_message(
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
             })?
     };
-    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::Message(response.clone()));
+    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::Message(
+        response.clone(),
+    ));
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
 
     // Enqueue push notification job (non-blocking; runs in background).
@@ -888,7 +916,9 @@ async fn post_thread_message(
             })?
     };
 
-    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::Message(response.clone()));
+    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::Message(
+        response.clone(),
+    ));
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
 
     // Enqueue push notification job (non-blocking; runs in background).
@@ -925,7 +955,9 @@ async fn post_thread_message(
             .into_iter()
             .next()
             .unwrap();
-        let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::MessageUpdated(root_response.clone()));
+        let ws_msg = std::sync::Arc::new(
+            crate::handlers::ws::messages::ServerWsMessage::MessageUpdated(root_response.clone()),
+        );
         state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
     }
 
@@ -1018,7 +1050,9 @@ async fn patch_message(
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
             })?
     };
-    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::MessageUpdated(response.clone()));
+    let ws_msg = std::sync::Arc::new(
+        crate::handlers::ws::messages::ServerWsMessage::MessageUpdated(response.clone()),
+    );
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
 
     Ok(Json(response))
@@ -1148,7 +1182,9 @@ async fn delete_message(
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
             })?
     };
-    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::MessageDeleted(response.clone()));
+    let ws_msg = std::sync::Arc::new(
+        crate::handlers::ws::messages::ServerWsMessage::MessageDeleted(response.clone()),
+    );
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
 
     Ok(StatusCode::NO_CONTENT)

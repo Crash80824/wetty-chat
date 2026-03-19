@@ -223,6 +223,9 @@ async fn patch_group(
 pub fn router() -> axum::Router<crate::AppState> {
     axum::Router::new()
         .route("/", axum::routing::post(post_group))
-        .route("/{chat_id}", axum::routing::get(get_group).patch(patch_group))
+        .route(
+            "/{chat_id}",
+            axum::routing::get(get_group).patch(patch_group),
+        )
         .nest("/{chat_id}/members", crate::handlers::members::router())
 }

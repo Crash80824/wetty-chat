@@ -21,9 +21,7 @@ impl Instrumentation for TracingInstrumentation {
 /// Call once at startup. Only installs instrumentation in debug builds.
 pub(crate) fn install() {
     {
-        diesel::connection::set_default_instrumentation(|| {
-            Some(Box::new(TracingInstrumentation))
-        })
-        .expect("failed to set diesel instrumentation");
+        diesel::connection::set_default_instrumentation(|| Some(Box::new(TracingInstrumentation)))
+            .expect("failed to set diesel instrumentation");
     }
 }

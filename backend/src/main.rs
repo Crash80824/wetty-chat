@@ -97,7 +97,9 @@ async fn main() {
     }
 
     let metrics = Arc::new(metrics::Metrics::new());
-    let ws_registry = Arc::new(services::ws_registry::ConnectionRegistry::new(metrics.clone()));
+    let ws_registry = Arc::new(services::ws_registry::ConnectionRegistry::new(
+        metrics.clone(),
+    ));
 
     let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let mut s3_config_builder = aws_sdk_s3::config::Builder::from(&aws_config);
@@ -120,8 +122,7 @@ async fn main() {
         _ => AuthMethod::UIDHeader,
     };
     let app_addr = read_socket_addr("APP_ADDR", SocketAddr::from(([0, 0, 0, 0], 3000)));
-    let metrics_addr =
-        read_socket_addr("METRICS_ADDR", SocketAddr::from(([0, 0, 0, 0], 3001)));
+    let metrics_addr = read_socket_addr("METRICS_ADDR", SocketAddr::from(([0, 0, 0, 0], 3001)));
 
     let mut discuz_cookie_prefix = String::new();
     let mut discuz_authkey = String::new();

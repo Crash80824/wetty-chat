@@ -127,10 +127,10 @@ async fn get_members(
             cm_dsl::username.nullable(),
         ))
         .load(conn)
-    .map_err(|e| {
-        tracing::error!("list members: {:?}", e);
-        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to list members")
-    })?;
+        .map_err(|e| {
+            tracing::error!("list members: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to list members")
+        })?;
 
     let members = rows
         .into_iter()
@@ -329,16 +329,16 @@ async fn patch_member(
     let (role, joined_at, username): (GroupRole, DateTime<Utc>, Option<String>) =
         group_membership::table
             .left_join(cm_dsl::common_member.on(gm_dsl::uid.eq(cm_dsl::uid)))
-        .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(target_uid)))
-        .select((gm_dsl::role, gm_dsl::joined_at, cm_dsl::username.nullable()))
-        .first(conn)
-        .map_err(|e| {
-            tracing::error!("get updated member: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to get updated member",
-            )
-        })?;
+            .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(target_uid)))
+            .select((gm_dsl::role, gm_dsl::joined_at, cm_dsl::username.nullable()))
+            .first(conn)
+            .map_err(|e| {
+                tracing::error!("get updated member: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to get updated member",
+                )
+            })?;
 
     Ok(Json(MemberResponse {
         uid: target_uid,

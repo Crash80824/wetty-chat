@@ -53,7 +53,9 @@ pub mod opt {
         match v {
             None => Ok(None),
             Some(StringOrNumberOrNull::Null) => Ok(None),
-            Some(StringOrNumberOrNull::Str(s)) => s.parse().map(Some).map_err(serde::de::Error::custom),
+            Some(StringOrNumberOrNull::Str(s)) => {
+                s.parse().map(Some).map_err(serde::de::Error::custom)
+            }
             Some(StringOrNumberOrNull::Num(n)) => Ok(Some(n)),
         }
     }

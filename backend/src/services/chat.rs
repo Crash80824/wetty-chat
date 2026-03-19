@@ -4,6 +4,8 @@ use diesel::PgConnection;
 use std::collections::HashMap;
 use tracing::warn;
 
+const MAX_UNREAD_COUNT: i64 = 100;
+
 #[derive(QueryableByName)]
 struct UnreadCountRow {
     #[diesel(sql_type = diesel::sql_types::Integer)]
@@ -12,7 +14,7 @@ struct UnreadCountRow {
     unread_count: i64,
 }
 
-/// Calculate the global unread count for a given list of user IDs.
+/// Calculate capped global unread counts for badge-style displays.
 pub fn get_unread_counts(
     conn: &mut PgConnection,
     target_uids: &[i32],
@@ -22,25 +24,31 @@ pub fn get_unread_counts(
     }
 
     let query = sql_query(
-        "SELECT gm.uid, COALESCE(SUM(chat_counts.unread_count), 0) AS unread_count
-         FROM group_membership AS gm
+        "WITH input_uids AS (
+             SELECT DISTINCT uid
+             FROM UNNEST($1::int[]) AS input(uid)
+         )
+         SELECT input_uids.uid, COUNT(unread_messages.marker)::bigint AS unread_count
+         FROM input_uids
          LEFT JOIN LATERAL (
-             SELECT count(*)::bigint AS unread_count
-             FROM messages AS m
-             WHERE m.chat_id = gm.chat_id
+             SELECT 1 AS marker
+             FROM group_membership AS gm
+             JOIN messages AS m
+               ON m.chat_id = gm.chat_id
+             WHERE gm.uid = input_uids.uid
                AND m.id > COALESCE(gm.last_read_message_id, 0)
                AND m.deleted_at IS NULL
                AND m.reply_root_id IS NULL
-         ) AS chat_counts ON TRUE
-         WHERE gm.uid = ANY($1)
-         GROUP BY gm.uid",
+             LIMIT 100
+         ) AS unread_messages ON TRUE
+         GROUP BY input_uids.uid",
     )
     .bind::<diesel::sql_types::Array<diesel::sql_types::Integer>, _>(target_uids.to_vec());
 
     match query.load::<UnreadCountRow>(conn) {
         Ok(rows) => Ok(rows
             .into_iter()
-            .map(|row| (row.uid, row.unread_count))
+            .map(|row| (row.uid, row.unread_count.min(MAX_UNREAD_COUNT)))
             .collect()),
         Err(e) => {
             warn!("Failed to load unread counts: {:?}", e);
