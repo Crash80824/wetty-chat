@@ -83,7 +83,8 @@ export default function ChatThreadCore({ chatId: propChatId, threadId: propThrea
     if (!apiChatId || storedName != null) return;
     getGroupInfo(apiChatId)
       .then((res) => {
-        const { id: _, ...meta } = res.data;
+        const { id, ...meta } = res.data;
+        void id;
         dispatch(setChatMeta({ chatId: apiChatId, meta }));
       })
       .catch(() => { });
@@ -376,7 +377,7 @@ export default function ChatThreadCore({ chatId: propChatId, threadId: propThrea
       });
   }, [apiChatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingMessage, currentUserId, currentUserName, currentUserAvatarUrl]);
 
-  const onClickChatItem = useCallback((messageIndex: number) => {
+  const onClickChatItem = (messageIndex: number) => {
     const msg = messages[messageIndex];
     const isOwn = msg.sender.uid === currentUserId;
     presentActionSheet({
@@ -419,7 +420,7 @@ export default function ChatThreadCore({ chatId: propChatId, threadId: propThrea
         { text: t`Cancel`, role: 'cancel' as const, handler: () => { } },
       ],
     });
-  }, [messages, apiChatId, threadId, history, showToast, presentActionSheet, setReplyingTo, setEditingMessage, presentAlert]);
+  };
 
   return (
     <div className="ion-page chat-thread-page">

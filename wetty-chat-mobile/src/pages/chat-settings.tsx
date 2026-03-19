@@ -67,7 +67,8 @@ export default function ChatSettingsCore({ chatId: propChatId, backAction }: Cha
     setLoading(true);
     getGroupInfo(chatId)
       .then((res) => {
-        const { id: _, ...meta } = res.data;
+        const { id, ...meta } = res.data;
+        void id;
         dispatch(setChatMeta({ chatId, meta }));
         applyDetails(meta);
       })
@@ -75,7 +76,7 @@ export default function ChatSettingsCore({ chatId: propChatId, backAction }: Cha
         presentToast({ message: err.message || t`Failed to load chat details`, duration: 3000 });
       })
       .finally(() => setLoading(false));
-  }, [chatId]);
+  }, [chatId, cachedMeta, dispatch, presentToast]);
 
   const handleSave = () => {
     if (!chatId) return;

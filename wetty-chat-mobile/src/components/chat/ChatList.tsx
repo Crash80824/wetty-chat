@@ -21,6 +21,7 @@ import { selectEffectiveLocale } from '@/store/settingsSlice';
 import { Trans } from '@lingui/react/macro';
 import { type MessageResponse, markMessagesAsRead } from '@/api/messages';
 import { t } from '@lingui/core/macro';
+import { clearAppBadgeCount, setAppBadgeCount } from '@/utils/badges';
 import styles from './ChatList.module.scss';
 
 function formatLastActivity(isoString: string | null, locale: string): string {
@@ -100,7 +101,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadChats = () => {
+  const loadChats = useCallback(() => {
     setLoading(true);
     getChats()
       .then((res) => {
@@ -112,26 +113,18 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
         setError(err.message || t`Failed to load chats`);
       })
       .finally(() => setLoading(false));
-  };
+  }, [dispatch]);
 
   const updateAppBadge = useCallback(async () => {
     try {
       const res = await getUnreadCount();
       if (res.data.unread_count > 0) {
-        if (navigator.setAppBadge) {
-          // @ts-ignore
-          navigator.setAppBadge(res.data.unread_count).catch(console.error);
-        }
+        setAppBadgeCount(navigator, res.data.unread_count)?.catch(console.error);
       } else {
-        if (navigator.clearAppBadge) {
-          // @ts-ignore
-          navigator.clearAppBadge().catch(console.error);
-        }
+        clearAppBadgeCount(navigator)?.catch(console.error);
       }
     } catch (error) {
-      if (navigator.clearAppBadge) {
-        navigator.clearAppBadge()
-      }
+      clearAppBadgeCount(navigator);
       console.error(error);
     }
   }, []);
@@ -139,7 +132,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
   useEffect(() => {
     loadChats();
     updateAppBadge();
-  }, []);
+  }, [loadChats, updateAppBadge]);
 
   const handleToggleRead = async (chat: ChatListItem, slidingItem: HTMLIonItemSlidingElement | null) => {
     slidingItem?.close();

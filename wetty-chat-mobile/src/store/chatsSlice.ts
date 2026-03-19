@@ -92,7 +92,7 @@ export const selectAllChats = createSelector(
   [selectChatsById],
   (byId): ChatListItem[] => {
     return Object.entries(byId)
-      .filter(([_, meta]) => meta.in_list)
+      .filter(([, meta]) => meta.in_list)
       .map(([id, meta]) => ({
         id,
         name: meta.name ?? null,

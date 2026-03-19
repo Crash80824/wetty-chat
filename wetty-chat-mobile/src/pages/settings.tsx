@@ -157,7 +157,7 @@ export function SettingsCore({ backAction, onOpenLanguage }: SettingsCoreProps) 
                 }
               }
               presentToast({ message: t`No service worker registered`, duration: 2000 });
-            } catch (e) {
+            } catch {
               presentToast({ message: t`Update check failed`, duration: 2000 });
             }
           }}>

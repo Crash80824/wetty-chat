@@ -5,6 +5,7 @@ import {
     precacheAndRoute,
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { setAppBadgeCount } from './utils/badges';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -48,8 +49,7 @@ self.addEventListener('push', (event) => {
             const body = payload.body;
 
             if (typeof payload.unread_count === 'number' && 'setAppBadge' in self.navigator) {
-                // @ts-ignore
-                self.navigator.setAppBadge(payload.unread_count).catch(console.error);
+                setAppBadgeCount(self.navigator, payload.unread_count)?.catch(console.error);
             }
 
             const promiseChain = self.registration.showNotification(title, {
