@@ -6,7 +6,7 @@ impl Instrumentation for TracingInstrumentation {
     fn on_connection_event(&mut self, event: InstrumentationEvent<'_>) {
         match event {
             InstrumentationEvent::StartQuery { query, .. } => {
-                tracing::debug!(sql = %query, "db query");
+                tracing::trace!(sql = %query, "db query");
             }
             InstrumentationEvent::FinishQuery { query, error, .. } => {
                 if let Some(err) = error {
@@ -20,7 +20,6 @@ impl Instrumentation for TracingInstrumentation {
 
 /// Call once at startup. Only installs instrumentation in debug builds.
 pub(crate) fn install() {
-    #[cfg(debug_assertions)]
     {
         diesel::connection::set_default_instrumentation(|| {
             Some(Box::new(TracingInstrumentation))
