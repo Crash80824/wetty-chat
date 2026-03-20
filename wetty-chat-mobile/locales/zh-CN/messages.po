@@ -13,11 +13,19 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/components/chat/messagePreview.ts
+msgid "[Attachment]"
+msgstr "[附件]"
+
 #: src/components/chat/ChatList.tsx
-#: src/pages/chat-thread.tsx
+#: src/components/chat/messagePreview.ts
 #: src/pages/chat-thread.tsx
 msgid "[Deleted]"
 msgstr "[已删除]"
+
+#: src/components/chat/messagePreview.ts
+msgid "[Image]"
+msgstr "[图片]"
 
 #: src/App.tsx
 msgid "A new version of the app is available!"

@@ -3,11 +3,15 @@ import { IonIcon } from '@ionic/react';
 import { addCircleOutline, happyOutline, paperPlane, closeCircle } from 'ionicons/icons';
 import styles from './MessageComposeBar.module.scss';
 import { UploadPreview, type ImageUploadDraft } from './UploadPreview';
+import type { Attachment } from '@/api/messages';
+import { getMessagePreviewText } from './messagePreview';
 
 interface ReplyTo {
   messageId: string;
   username: string;
-  text: string;
+  text?: string | null;
+  attachments?: Attachment[];
+  isDeleted?: boolean;
 }
 
 export interface EditingMessage {
@@ -364,7 +368,11 @@ export function MessageComposeBar({
           <div className={styles.replyPreview}>
             <div className={styles.replyText}>
               <span className={styles.replyUsername}>Replying to {replyTo.username}</span>
-              <span className={styles.replySnippet}>{replyTo.text}</span>
+              <span className={styles.replySnippet}>{getMessagePreviewText({
+                message: replyTo.text,
+                attachments: replyTo.attachments,
+                isDeleted: replyTo.isDeleted,
+              })}</span>
             </div>
             <button type="button" className={styles.replyClose} aria-label="Cancel reply" onClick={onCancelReply}>
               <IonIcon icon={closeCircle} />

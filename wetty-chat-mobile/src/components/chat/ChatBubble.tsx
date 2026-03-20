@@ -5,6 +5,7 @@ import { t } from '@lingui/core/macro';
 import styles from './ChatBubble.module.scss';
 import type { Attachment } from '@/api/messages';
 import { ImageViewer } from './ImageViewer';
+import { getMessagePreviewText } from './messagePreview';
 
 interface ChatBubbleProps {
   senderName: string;
@@ -20,7 +21,9 @@ interface ChatBubbleProps {
   onAvatarClick?: () => void;
   replyTo?: {
     senderName: string;
-    message: string;
+    message?: string | null;
+    attachments?: Attachment[];
+    isDeleted?: boolean;
   };
   timestamp?: string;
   edited?: boolean;
@@ -219,7 +222,11 @@ export function ChatBubble({
                 onClick={onReplyTap}
               >
                 <div className={styles.replyPreviewName}>{replyTo.senderName}</div>
-                <div className={styles.replyPreviewText}>{replyTo.message}</div>
+                <div className={styles.replyPreviewText}>{getMessagePreviewText({
+                  message: replyTo.message,
+                  attachments: replyTo.attachments,
+                  isDeleted: replyTo.isDeleted,
+                })}</div>
               </div>
             )}
             {attachments && attachments.length > 0 && (

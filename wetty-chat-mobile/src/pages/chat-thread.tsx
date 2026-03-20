@@ -87,6 +87,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       .catch(() => { });
   }, [chatId, storedName, dispatch]);
   const messages = useSelector((state: RootState) => selectMessagesForChat(state, storeChatId));
+  const messageLookup = new Map(messages.map((message) => [message.id, message]));
 
   const formatDateSeparator = useCallback((iso: string) => {
     if (!iso) return '';
@@ -342,6 +343,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         message: replyingTo.message,
         sender: replyingTo.sender,
         is_deleted: replyingTo.is_deleted,
+        attachments: replyingTo.attachments,
       } : undefined,
       client_generated_id: clientGeneratedId,
       sender: {
@@ -383,7 +385,13 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         const postResponse = res.data;
         const confirmed: MessageResponse = {
           ...postResponse,
-          reply_to_message: postResponse.reply_to_message ?? optimistic.reply_to_message,
+          reply_to_message: postResponse.reply_to_message
+            ? {
+              ...optimistic.reply_to_message,
+              ...postResponse.reply_to_message,
+              attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
+            }
+            : optimistic.reply_to_message,
         };
         dispatch(messageConfirmed({
           chatId,
@@ -542,7 +550,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
                   isConfirmed={!msg.id.startsWith('cg_')}
                   replyTo={msg.reply_to_message ? {
                     senderName: msg.reply_to_message.sender.name ?? `User ${msg.reply_to_message.sender.uid}`,
-                    message: msg.reply_to_message.is_deleted ? t`[Deleted]` : (msg.reply_to_message.message ?? ''),
+                    message: msg.reply_to_message.message,
+                    attachments: messageLookup.get(msg.reply_to_message.id)?.attachments ?? msg.reply_to_message.attachments,
+                    isDeleted: msg.reply_to_message.is_deleted,
                   } : undefined}
                 />
               </>
@@ -573,7 +583,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           replyTo={replyingTo ? {
             messageId: replyingTo.id,
             username: replyingTo.sender.name ?? `User ${replyingTo.sender.uid}`,
-            text: replyingTo.message ?? '',
+            text: replyingTo.message,
+            attachments: replyingTo.attachments,
+            isDeleted: replyingTo.is_deleted,
           } : undefined}
           onCancelReply={() => setReplyingTo(null)}
           editing={editingMessage ? {
