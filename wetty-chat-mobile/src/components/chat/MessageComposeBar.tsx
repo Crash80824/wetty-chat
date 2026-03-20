@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { IonIcon } from '@ionic/react';
-import { addCircleOutline, happyOutline, paperPlane, closeCircle, imageOutline } from 'ionicons/icons';
+import { addCircleOutline, happyOutline, paperPlane, closeCircle } from 'ionicons/icons';
 import styles from './MessageComposeBar.module.scss';
 import { requestUploadUrl, uploadFileToS3 } from '@/api/upload';
+import { UploadPreview, type UploadPreviewAttachment } from './UploadPreview';
 
 interface ReplyTo {
   messageId: string;
@@ -29,7 +30,7 @@ export function MessageComposeBar({ onSend, replyTo, onCancelReply, editing, onC
   const [text, setText] = useState('');
   const prevTextLenRef = useRef(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [attachments, setAttachments] = useState<{ id: string, name: string, previewUrl?: string }[]>([]);
+  const [attachments, setAttachments] = useState<UploadPreviewAttachment[]>([]);
 
   useEffect(() => {
     if (editing) {
@@ -161,14 +162,13 @@ export function MessageComposeBar({ onSend, replyTo, onCancelReply, editing, onC
     return () => document.removeEventListener('paste', handleGlobalPaste);
   }, [processFile]);
 
-  const removeAttachment = (index: number) => {
+  const removeAttachment = (attachmentId: string) => {
     setAttachments(prev => {
-      const newAttachments = [...prev];
-      const removed = newAttachments.splice(index, 1)[0];
-      if (removed.previewUrl) {
+      const removed = prev.find((attachment) => attachment.id === attachmentId);
+      if (removed?.previewUrl) {
         URL.revokeObjectURL(removed.previewUrl);
       }
-      return newAttachments;
+      return prev.filter((attachment) => attachment.id !== attachmentId);
     });
   };
 
@@ -214,21 +214,7 @@ export function MessageComposeBar({ onSend, replyTo, onCancelReply, editing, onC
         ) : null}
 
         {attachments.length > 0 && (
-          <div className={styles.attachmentsPreview}>
-            {attachments.map((att, idx) => (
-              <div key={idx} className={styles.attachmentChip}>
-                {att.previewUrl ? (
-                  <img src={att.previewUrl} alt={att.name} className={styles.attachmentPreviewImage} />
-                ) : (
-                  <IonIcon icon={imageOutline} />
-                )}
-                <span className={styles.attachmentName}>{att.name}</span>
-                <button type="button" className={styles.removeAttachment} onClick={() => removeAttachment(idx)}>
-                  <IonIcon icon={closeCircle} />
-                </button>
-              </div>
-            ))}
-          </div>
+          <UploadPreview attachments={attachments} onRemove={removeAttachment} />
         )}
 
         <div className={styles.inputRow}>
