@@ -56,7 +56,7 @@ function midpoint(a: Point, b: Point): Point {
   };
 }
 
-function getTouchPoint(touch: Touch): Point {
+function getTouchPoint(touch: Pick<Touch, 'clientX' | 'clientY'>): Point {
   return { x: touch.clientX, y: touch.clientY };
 }
 
