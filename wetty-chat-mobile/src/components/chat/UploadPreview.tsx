@@ -1,6 +1,6 @@
 import { IonIcon } from '@ionic/react';
 import { t } from '@lingui/core/macro';
-import { alertCircleOutline, closeCircle, refreshOutline } from 'ionicons/icons';
+import { alertCircleOutline, closeCircle, documentOutline, refreshOutline } from 'ionicons/icons';
 import styles from './UploadPreview.module.scss';
 
 export type ComposeUploadDraftStatus = 'uploading' | 'uploaded' | 'error';
@@ -10,38 +10,61 @@ export interface ImageUploadDraft {
   kind: 'image';
   name: string;
   previewUrl: string;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
   progress: number;
   status: ComposeUploadDraftStatus;
   attachmentId?: string;
   errorMessage?: string;
 }
 
+export interface ExistingAttachmentPreview {
+  localId: string;
+  attachmentId: string;
+  kind: string;
+  name: string;
+  previewUrl?: string;
+}
+
+export type UploadPreviewItem =
+  | ({ itemType: 'draft' } & ImageUploadDraft)
+  | ({ itemType: 'existing' } & ExistingAttachmentPreview);
+
 interface UploadPreviewProps {
-  drafts: ImageUploadDraft[];
+  items: UploadPreviewItem[];
   onRemove: (localId: string) => void;
   onRetry: (localId: string) => void;
 }
 
-export function UploadPreview({ drafts, onRemove, onRetry }: UploadPreviewProps) {
-  if (drafts.length === 0) return null;
+export function UploadPreview({ items, onRemove, onRetry }: UploadPreviewProps) {
+  if (items.length === 0) return null;
 
   return (
     <div className={styles.previewTray} aria-label={t`Attachment preview tray`}>
-      {drafts.map((draft) => (
-        <article key={draft.localId} className={styles.card}>
-          <img src={draft.previewUrl} alt={draft.name} className={styles.previewImage} />
+      {items.map((item) => (
+        <article key={item.localId} className={styles.card}>
+          {item.previewUrl ? (
+            <img src={item.previewUrl} alt={item.name} className={styles.previewImage} />
+          ) : (
+            <div className={styles.fileCard}>
+              <IonIcon icon={documentOutline} className={styles.fileCardIcon} />
+              <span className={styles.fileCardName}>{item.name}</span>
+            </div>
+          )}
           <button
             type="button"
             className={styles.removeButton}
-            aria-label={t`Remove ${draft.name}`}
-            onClick={() => onRemove(draft.localId)}
+            aria-label={t`Remove ${item.name}`}
+            onClick={() => onRemove(item.localId)}
           >
             <IonIcon icon={closeCircle} />
           </button>
 
-          {draft.status !== 'uploaded' && (
-            <div className={`${styles.overlay} ${draft.status === 'error' ? styles.overlayError : ''}`}>
-              {draft.status === 'uploading' ? (
+          {item.itemType === 'draft' && item.status !== 'uploaded' && (
+            <div className={`${styles.overlay} ${item.status === 'error' ? styles.overlayError : ''}`}>
+              {item.status === 'uploading' ? (
                 <>
                   <div className={styles.progressRing} aria-hidden="true">
                     <svg viewBox="0 0 36 36">
@@ -52,21 +75,21 @@ export function UploadPreview({ drafts, onRemove, onRetry }: UploadPreviewProps)
                       <path
                         className={styles.progressValue}
                         d="M18 2.5a15.5 15.5 0 1 1 0 31a15.5 15.5 0 1 1 0-31"
-                        style={{ strokeDasharray: `${draft.progress}, 100` }}
+                        style={{ strokeDasharray: `${item.progress}, 100` }}
                       />
                     </svg>
-                    <span className={styles.progressLabel}>{draft.progress}%</span>
+                    <span className={styles.progressLabel}>{item.progress}%</span>
                   </div>
                   <span className={styles.statusText}>{t`Uploading`}</span>
                 </>
               ) : (
                 <>
                   <IonIcon icon={alertCircleOutline} className={styles.errorIcon} />
-                  <span className={styles.statusText}>{draft.errorMessage ?? t`Upload failed`}</span>
+                  <span className={styles.statusText}>{item.errorMessage ?? t`Upload failed`}</span>
                   <button
                     type="button"
                     className={styles.retryButton}
-                    onClick={() => onRetry(draft.localId)}
+                    onClick={() => onRetry(item.localId)}
                   >
                     <IonIcon icon={refreshOutline} />
                     {t`Retry`}

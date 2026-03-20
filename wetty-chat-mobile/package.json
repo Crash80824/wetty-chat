@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build -c vite.config.staging.ts",
     "build-prod": "tsc -b && vite build --base=/chat/ --outDir prod-dist -c vite.config.prod.ts",
     "lint": "eslint .",
+    "verify": "npm run lint && npm run typecheck",
     "extract": "lingui extract",
     "preview": "vite preview -c vite.config.staging.ts",
     "typecheck": "tsc --noEmit"

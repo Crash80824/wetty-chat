@@ -27,6 +27,7 @@ import {
   deleteMessage,
   markMessagesAsRead,
   type MessageResponse,
+  type Attachment,
 } from '@/api/messages';
 import { selectChatName, setChatMeta, markChatAsRead } from '@/store/chatsSlice';
 import {
@@ -45,7 +46,12 @@ import store from '@/store/index';
 import type { RootState } from '@/store/index';
 import { VirtualScroll } from '@/components/chat/VirtualScroll';
 import { ChatBubble } from '@/components/chat/ChatBubble';
-import { MessageComposeBar, type ComposeUploadInput } from '@/components/chat/MessageComposeBar';
+import {
+  MessageComposeBar,
+  type ComposeUploadInput,
+  type ComposeSendPayload,
+  type ComposeUploadedAttachment,
+} from '@/components/chat/MessageComposeBar';
 import './chat-thread.scss';
 import { t } from '@lingui/core/macro';
 import { FeatureGate } from '@/components/FeatureGate';
@@ -56,6 +62,37 @@ import { requestUploadUrl, uploadFileToS3 } from '@/api/upload';
 
 function generateClientId(): string {
   return `cg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function areAttachmentIdsEqual(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function buildOptimisticUploadedAttachments(
+  uploadedAttachments: ComposeUploadedAttachment[],
+): { attachments: Attachment[]; revoke: () => void } {
+  const previewUrls: string[] = [];
+  const attachments = uploadedAttachments.map((attachment) => {
+    const previewUrl = URL.createObjectURL(attachment.file);
+    previewUrls.push(previewUrl);
+
+    return {
+      id: attachment.attachmentId,
+      url: previewUrl,
+      kind: attachment.mimeType,
+      size: attachment.size,
+      file_name: attachment.file.name,
+      width: attachment.width ?? null,
+      height: attachment.height ?? null,
+    };
+  });
+
+  return {
+    attachments,
+    revoke: () => {
+      previewUrls.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
+    },
+  };
 }
 
 interface ChatThreadCoreProps {
@@ -294,32 +331,43 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     return { attachmentId: attachment_id };
   }, []);
 
-  const handleSend = useCallback((text: string, attachmentIds?: string[]) => {
+  const handleSend = useCallback((payload: ComposeSendPayload) => {
     if (!chatId) return;
+    const { text, attachmentIds, existingAttachments, uploadedAttachments } = payload;
+    const { attachments: optimisticUploadedAttachments, revoke } = buildOptimisticUploadedAttachments(uploadedAttachments);
 
-    if (!text.trim() && (!attachmentIds || attachmentIds.length === 0)) {
+    if (!text.trim() && attachmentIds.length === 0) {
+      revoke();
       return;
     }
 
     // Edit flow
     if (editingMessage) {
-      if (!text.trim()) {
+      const originalAttachmentIds = (editingMessage.attachments ?? []).map((attachment) => attachment.id);
+      if (!text.trim() && attachmentIds.length === 0) {
+        revoke();
         showToast(t`Message cannot be empty`);
         return;
       }
-      if (text.trim() === editingMessage.message?.trim()) {
-        setEditingMessage(null);
+      if (text.trim() === (editingMessage.message?.trim() ?? '') && areAttachmentIdsEqual(attachmentIds, originalAttachmentIds)) {
+        revoke();
         return;
       }
 
       const messageId = editingMessage.id;
-      const optimisticMsg = { ...editingMessage, message: text, is_edited: true };
+      const optimisticMsg = {
+        ...editingMessage,
+        message: text,
+        attachments: [...existingAttachments, ...optimisticUploadedAttachments],
+        has_attachments: attachmentIds.length > 0,
+        is_edited: true,
+      };
 
       // Optimistic update
       dispatch(messagePatched({ chatId, messageId, message: optimisticMsg }));
       setEditingMessage(null);
 
-      updateMessage(chatId, messageId, { message: text })
+      updateMessage(chatId, messageId, { message: text, attachment_ids: attachmentIds })
         .then((res) => {
           dispatch(messagePatched({ chatId, messageId, message: res.data }));
         })
@@ -327,6 +375,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           // Revert optimistic update
           dispatch(messagePatched({ chatId, messageId, message: editingMessage }));
           showToast(err.message || t`Failed to edit message`);
+        })
+        .finally(() => {
+          revoke();
         });
       return;
     }
@@ -355,7 +406,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       created_at: new Date().toISOString(),
       is_edited: false,
       is_deleted: false,
-      has_attachments: (attachmentIds && attachmentIds.length > 0) || false,
+      has_attachments: attachmentIds.length > 0,
+      attachments: optimisticUploadedAttachments,
       thread_info: undefined,
     };
     dispatch(messageAdded({
@@ -409,6 +461,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           messageId: clientGeneratedId,
           message: { ...optimistic, is_deleted: true }
         }));
+      })
+      .finally(() => {
+        revoke();
       });
   }, [chatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingMessage, currentUserId, currentUserName, currentUserAvatarUrl]);
 
@@ -591,6 +646,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           editing={editingMessage ? {
             messageId: editingMessage.id,
             text: editingMessage.message ?? '',
+            attachments: editingMessage.attachments,
           } : undefined}
           onCancelEdit={() => setEditingMessage(null)}
         />

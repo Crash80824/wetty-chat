@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { IonIcon } from '@ionic/react';
+import { t } from '@lingui/core/macro';
 import { addCircleOutline, happyOutline, paperPlane, closeCircle } from 'ionicons/icons';
 import styles from './MessageComposeBar.module.scss';
 import { UploadPreview, type ImageUploadDraft } from './UploadPreview';
@@ -17,6 +18,7 @@ interface ReplyTo {
 export interface EditingMessage {
   messageId: string;
   text: string;
+  attachments?: Attachment[];
 }
 
 export interface ComposeUploadInput {
@@ -33,6 +35,22 @@ export interface ComposeUploadResult {
   attachmentId: string;
 }
 
+export interface ComposeUploadedAttachment {
+  attachmentId: string;
+  file: File;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
+}
+
+export interface ComposeSendPayload {
+  text: string;
+  attachmentIds: string[];
+  existingAttachments: Attachment[];
+  uploadedAttachments: ComposeUploadedAttachment[];
+}
+
 interface DraftUploadRecord {
   draft: ImageUploadDraft;
   file: File;
@@ -40,7 +58,7 @@ interface DraftUploadRecord {
 }
 
 interface MessageComposeBarProps {
-  onSend: (text: string, attachmentIds?: string[]) => void;
+  onSend: (payload: ComposeSendPayload) => void;
   uploadAttachment: (input: ComposeUploadInput) => Promise<ComposeUploadResult>;
   replyTo?: ReplyTo;
   onCancelReply?: () => void;
@@ -74,6 +92,7 @@ export function MessageComposeBar({
   const [text, setText] = useState('');
   const prevTextLenRef = useRef(0);
   const [drafts, setDrafts] = useState<DraftUploadRecord[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
 
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
@@ -101,6 +120,7 @@ export function MessageComposeBar({
     if (editing) {
       setText(editing.text);
       prevTextLenRef.current = editing.text.length;
+      setExistingAttachments(editing.attachments ?? []);
       setDrafts((prev) => {
         prev.forEach(cleanupDraft);
         return [];
@@ -108,6 +128,7 @@ export function MessageComposeBar({
     } else {
       setText('');
       prevTextLenRef.current = 0;
+      setExistingAttachments([]);
       const ta = textareaRef.current;
       if (ta) ta.style.height = 'auto';
     }
@@ -162,6 +183,18 @@ export function MessageComposeBar({
 
     try {
       const dimensions = await getImageDimensions(file);
+      setDrafts((prev) => prev.map((draftRecord) => (
+        draftRecord.draft.localId === localId
+          ? {
+            ...draftRecord,
+            draft: {
+              ...draftRecord.draft,
+              width: dimensions.width,
+              height: dimensions.height,
+            },
+          }
+          : draftRecord
+      )));
       const result = await uploadAttachment({
         file,
         dimensions,
@@ -212,7 +245,7 @@ export function MessageComposeBar({
               status: 'error',
               progress: 0,
               attachmentId: undefined,
-              errorMessage: 'Upload failed',
+              errorMessage: t`Upload failed`,
             },
           }
           : draftRecord
@@ -233,6 +266,8 @@ export function MessageComposeBar({
         kind: 'image' as const,
         name: file.name,
         previewUrl: URL.createObjectURL(file),
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
         progress: 0,
         status: 'uploading' as const,
       },
@@ -246,18 +281,35 @@ export function MessageComposeBar({
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
-    const attachmentIds = drafts
-      .map((draftRecord) => draftRecord.draft.attachmentId)
-      .filter((attachmentId): attachmentId is string => Boolean(attachmentId));
+    const uploadedDrafts = drafts.filter((draftRecord) => (
+      draftRecord.draft.status === 'uploaded' && Boolean(draftRecord.draft.attachmentId)
+    ));
+    const attachmentIds = [
+      ...existingAttachments.map((attachment) => attachment.id),
+      ...uploadedDrafts.map((draftRecord) => draftRecord.draft.attachmentId!),
+    ];
 
     if (!trimmed && attachmentIds.length === 0) return;
 
-    onSend(trimmed, attachmentIds);
+    onSend({
+      text: trimmed,
+      attachmentIds,
+      existingAttachments,
+      uploadedAttachments: uploadedDrafts.map((draftRecord) => ({
+        attachmentId: draftRecord.draft.attachmentId!,
+        file: draftRecord.file,
+        mimeType: draftRecord.draft.mimeType,
+        size: draftRecord.draft.size,
+        width: draftRecord.draft.width,
+        height: draftRecord.draft.height,
+      })),
+    });
     setText('');
+    setExistingAttachments([]);
     clearDrafts(drafts);
     const ta = textareaRef.current;
     if (ta) ta.style.height = 'auto';
-  }, [clearDrafts, drafts, onSend, text]);
+  }, [clearDrafts, drafts, existingAttachments, onSend, text]);
 
   const handleSendRef = useRef(handleSend);
   useEffect(() => {
@@ -280,15 +332,12 @@ export function MessageComposeBar({
   }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (editing) return;
     const files = Array.from(e.target.files ?? []);
     queueFiles(files);
   };
 
   useEffect(() => {
     const handleGlobalPaste = (e: ClipboardEvent) => {
-      if (editing) return;
-
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -311,7 +360,7 @@ export function MessageComposeBar({
 
     document.addEventListener('paste', handleGlobalPaste);
     return () => document.removeEventListener('paste', handleGlobalPaste);
-  }, [editing, queueFiles]);
+  }, [queueFiles]);
 
   const removeDraft = useCallback((localId: string) => {
     setDrafts((prev) => {
@@ -329,10 +378,46 @@ export function MessageComposeBar({
     void startUpload(localId, file);
   }, [startUpload]);
 
+  const removeExistingAttachment = useCallback((localId: string) => {
+    const attachmentId = localId.replace(/^existing-/, '');
+    setExistingAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
+  }, []);
+
   const hasUploadingDraft = drafts.some((draftRecord) => draftRecord.draft.status === 'uploading');
   const hasFailedDraft = drafts.some((draftRecord) => draftRecord.draft.status === 'error');
-  const hasUploadedAttachment = drafts.some((draftRecord) => draftRecord.draft.status === 'uploaded');
-  const canSend = !hasUploadingDraft && !hasFailedDraft && (text.trim().length > 0 || hasUploadedAttachment);
+  const uploadedDrafts = drafts.filter((draftRecord) => draftRecord.draft.status === 'uploaded');
+  const currentAttachmentIds = [
+    ...existingAttachments.map((attachment) => attachment.id),
+    ...uploadedDrafts
+      .map((draftRecord) => draftRecord.draft.attachmentId)
+      .filter((attachmentId): attachmentId is string => Boolean(attachmentId)),
+  ];
+  const hasAttachment = currentAttachmentIds.length > 0;
+  const trimmedText = text.trim();
+  const originalEditText = editing?.text.trim() ?? '';
+  const originalAttachmentIds = editing?.attachments?.map((attachment) => attachment.id) ?? [];
+  const isUnchangedEdit = editing != null
+    && trimmedText === originalEditText
+    && currentAttachmentIds.length === originalAttachmentIds.length
+    && currentAttachmentIds.every((attachmentId, index) => attachmentId === originalAttachmentIds[index]);
+  const canSend = !hasUploadingDraft
+    && !hasFailedDraft
+    && (trimmedText.length > 0 || hasAttachment)
+    && !isUnchangedEdit;
+  const previewItems = [
+    ...existingAttachments.map((attachment) => ({
+      itemType: 'existing' as const,
+      localId: `existing-${attachment.id}`,
+      attachmentId: attachment.id,
+      kind: attachment.kind,
+      name: attachment.file_name,
+      previewUrl: attachment.kind.startsWith('image') ? attachment.url : undefined,
+    })),
+    ...drafts.map((draftRecord) => ({
+      itemType: 'draft' as const,
+      ...draftRecord.draft,
+    })),
+  ];
 
   return (
     <div className={styles.bar}>
@@ -347,9 +432,8 @@ export function MessageComposeBar({
       <button
         type="button"
         className={styles.attachBtn}
-        aria-label="Attach image"
+        aria-label={t`Attach image`}
         onClick={() => fileInputRef.current?.click()}
-        disabled={Boolean(editing)}
       >
         <IonIcon icon={addCircleOutline} />
       </button>
@@ -357,32 +441,38 @@ export function MessageComposeBar({
         {editing ? (
           <div className={styles.replyPreview}>
             <div className={styles.replyText}>
-              <span className={styles.replyUsername}>Edit message</span>
+              <span className={styles.replyUsername}>{t`Edit message`}</span>
               <span className={styles.replySnippet}>{editing.text}</span>
             </div>
-            <button type="button" className={styles.replyClose} aria-label="Cancel edit" onClick={onCancelEdit}>
+            <button type="button" className={styles.replyClose} aria-label={t`Cancel edit`} onClick={onCancelEdit}>
               <IonIcon icon={closeCircle} />
             </button>
           </div>
         ) : replyTo ? (
           <div className={styles.replyPreview}>
             <div className={styles.replyText}>
-              <span className={styles.replyUsername}>Replying to {replyTo.username}</span>
+              <span className={styles.replyUsername}>{t`Replying to ${replyTo.username}`}</span>
               <span className={styles.replySnippet}>{getMessagePreviewText({
                 message: replyTo.text,
                 attachments: replyTo.attachments,
                 isDeleted: replyTo.isDeleted,
               })}</span>
             </div>
-            <button type="button" className={styles.replyClose} aria-label="Cancel reply" onClick={onCancelReply}>
+            <button type="button" className={styles.replyClose} aria-label={t`Cancel reply`} onClick={onCancelReply}>
               <IonIcon icon={closeCircle} />
             </button>
           </div>
         ) : null}
 
         <UploadPreview
-          drafts={drafts.map((draftRecord) => draftRecord.draft)}
-          onRemove={removeDraft}
+          items={previewItems}
+          onRemove={(localId) => {
+            if (localId.startsWith('existing-')) {
+              removeExistingAttachment(localId);
+              return;
+            }
+            removeDraft(localId);
+          }}
           onRetry={retryDraft}
         />
 
@@ -390,7 +480,7 @@ export function MessageComposeBar({
           <textarea
             ref={textareaRef}
             className={styles.textarea}
-            placeholder="Message"
+            placeholder={t`Message`}
             value={text}
             rows={1}
             onChange={(e) => {
@@ -399,7 +489,7 @@ export function MessageComposeBar({
               prevTextLenRef.current = newLen;
             }}
           />
-          <button type="button" className={styles.stickerBtn} aria-label="Sticker">
+          <button type="button" className={styles.stickerBtn} aria-label={t`Sticker`}>
             <IonIcon icon={happyOutline} />
           </button>
         </div>
@@ -408,7 +498,7 @@ export function MessageComposeBar({
         type="button"
         className={`${styles.sendBtn}${!canSend ? ` ${styles.disabled}` : ''}`}
         onClick={handleSend}
-        aria-label="Send message"
+        aria-label={t`Send message`}
         disabled={!canSend}
       >
         <IonIcon icon={paperPlane} />

@@ -974,6 +974,8 @@ pub struct MessageIdPath {
 #[derive(serde::Deserialize)]
 pub struct UpdateMessageBody {
     message: String,
+    #[serde(default)]
+    attachment_ids: Vec<String>,
 }
 
 /// PATCH /chats/:chat_id/messages/:message_id — Edit a message.
@@ -1011,8 +1013,39 @@ async fn patch_message(
         return Err((StatusCode::BAD_REQUEST, "Cannot edit deleted message"));
     }
 
-    if body.message.trim().is_empty() {
+    if body.message.trim().is_empty() && body.attachment_ids.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "Message cannot be empty"));
+    }
+
+    let attachment_ids: Vec<i64> = body
+        .attachment_ids
+        .iter()
+        .filter_map(|s| s.parse().ok())
+        .collect();
+
+    use crate::schema::attachments::dsl as a_dsl;
+    diesel::update(attachments::table.filter(a_dsl::message_id.eq(message_id)))
+        .set(a_dsl::message_id.eq::<Option<i64>>(None))
+        .execute(conn)
+        .map_err(|e| {
+            tracing::error!("clear message attachments: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to update attachments",
+            )
+        })?;
+
+    if !attachment_ids.is_empty() {
+        diesel::update(attachments::table.filter(a_dsl::id.eq_any(&attachment_ids)))
+            .set(a_dsl::message_id.eq(message_id))
+            .execute(conn)
+            .map_err(|e| {
+                tracing::error!("replace message attachments: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to update attachments",
+                )
+            })?;
     }
 
     // Update message
@@ -1020,6 +1053,7 @@ async fn patch_message(
     let updated_message: Message = diesel::update(messages::table.filter(dsl::id.eq(message_id)))
         .set((
             dsl::message.eq(&body.message),
+            dsl::has_attachments.eq(!attachment_ids.is_empty()),
             dsl::updated_at.eq(Some(now)),
         ))
         .returning(Message::as_returning())

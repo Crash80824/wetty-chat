@@ -10,4 +10,5 @@ It uses Ionic Framework v8 and React
 when ever applicable.
 
 ## Lint
-After making changes, make sure to run `npm run lint` and ensure there are no linting errors
+After making changes, run `npm run verify` and ensure it passes.
+`npm run verify` covers both `npm run lint` and `npm run typecheck`.

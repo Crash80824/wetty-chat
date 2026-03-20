@@ -91,6 +91,7 @@ export function sendThreadMessage(
 
 export interface UpdateMessageBody {
   message: string;
+  attachment_ids?: string[];
 }
 
 export function updateMessage(
