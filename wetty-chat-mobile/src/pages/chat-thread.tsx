@@ -28,6 +28,7 @@ import {
   markMessagesAsRead,
   type MessageResponse,
   type Attachment,
+  type Sender,
 } from '@/api/messages';
 import { selectChatName, setChatMeta, markChatAsRead } from '@/store/chatsSlice';
 import {
@@ -56,6 +57,7 @@ import {
 import './chat-thread.scss';
 import { t } from '@lingui/core/macro';
 import { FeatureGate } from '@/components/FeatureGate';
+import { UserProfileModal } from '@/components/chat/UserProfileModal';
 import { getGroupInfo } from '@/api/group';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
@@ -170,6 +172,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
   const [atBottom, setAtBottom] = useState(true);
   const [replyingTo, setReplyingTo] = useState<MessageResponse | null>(null);
+  const [profileSender, setProfileSender] = useState<Sender | null>(null);
   const [editingSession, setEditingSession] = useState<EditSession | null>(null);
 
 
@@ -615,6 +618,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
                   edited={msg.is_edited}
                   threadInfo={!threadId ? msg.thread_info : undefined}
                   onThreadClick={() => history.push(`/chats/chat/${chatId}/thread/${msg.id}`)}
+                  onAvatarClick={() => setProfileSender(msg.sender)}
                   attachments={msg.attachments}
                   isConfirmed={!msg.id.startsWith('cg_')}
                   replyTo={msg.reply_to_message ? {
@@ -661,6 +665,11 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           onCancelEdit={() => setEditingSession(null)}
         />
       </IonFooter>
+      <UserProfileModal
+        key={profileSender?.uid}
+        sender={profileSender}
+        onDismiss={() => setProfileSender(null)}
+      />
     </div>
   );
 }

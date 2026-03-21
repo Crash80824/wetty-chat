@@ -230,7 +230,11 @@ export function ChatBubble({
         <div className={`${styles.chatRow} ${isSent ? styles.sent : styles.received}`}>
           {showAvatar ? (
             avatarUrl ? (
-              <div className={styles.avatar}>
+              <div
+                className={styles.avatar}
+                style={{ cursor: onAvatarClick ? 'pointer' : undefined }}
+                onClick={onAvatarClick}
+              >
                 <img src={avatarUrl} />
               </div>
             ) : (
