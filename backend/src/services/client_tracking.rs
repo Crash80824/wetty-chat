@@ -7,22 +7,24 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use chrono::{Days, Utc};
+use chrono::{Days, NaiveDate, NaiveDateTime, Utc};
 use dashmap::DashMap;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use tracing::{error, info, warn};
 
-use crate::models::NewClientRecord;
-use crate::schema::{clients, push_subscriptions};
+use crate::metrics::Metrics;
+use crate::models::{
+    ClientRecord, NewActivityDailyMetric, NewClientRecord, NewUserExtra, UserExtra,
+};
+use crate::schema::{activity_daily_metrics, clients, push_subscriptions, user_extra};
 use crate::utils::auth::{extract_current_uid, optional_client_id};
 
 const ACTIVITY_WRITE_THROTTLE: Duration = Duration::from_secs(5 * 60);
 const PURGE_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
 const PURGE_RESTART_DELAY: Duration = Duration::from_secs(1);
 const STALE_CLIENT_RETENTION_DAYS: u64 = 45;
-const LEGACY_SUBSCRIPTION_GRACE_DAYS: u64 = 90;
 
 #[derive(Clone, Copy)]
 struct CachedActivity {
@@ -30,15 +32,41 @@ struct CachedActivity {
     uid: i32,
 }
 
+#[derive(Clone, Copy)]
+struct DailyMetricDelta {
+    day: NaiveDate,
+    active_users: i64,
+    new_users: i64,
+    active_clients: i64,
+    new_clients: i64,
+    client_rebinds: i64,
+    stale_clients_purged: i64,
+    legacy_subscriptions_purged: i64,
+}
+
+impl DailyMetricDelta {
+    fn is_zero(self) -> bool {
+        self.active_users == 0
+            && self.new_users == 0
+            && self.active_clients == 0
+            && self.new_clients == 0
+            && self.client_rebinds == 0
+            && self.stale_clients_purged == 0
+            && self.legacy_subscriptions_purged == 0
+    }
+}
+
 pub struct ClientTrackingService {
     db: Pool<ConnectionManager<PgConnection>>,
+    metrics: Arc<Metrics>,
     recent_writes: DashMap<String, CachedActivity>,
 }
 
 impl ClientTrackingService {
-    pub fn start(db: Pool<ConnectionManager<PgConnection>>) -> Arc<Self> {
+    pub fn start(db: Pool<ConnectionManager<PgConnection>>, metrics: Arc<Metrics>) -> Arc<Self> {
         let service = Arc::new(Self {
             db,
+            metrics,
             recent_writes: DashMap::new(),
         });
 
@@ -67,13 +95,17 @@ impl ClientTrackingService {
     ) -> Result<(), (StatusCode, &'static str)> {
         if let Some(entry) = self.recent_writes.get(client_id) {
             if entry.uid == uid && entry.last_written_at.elapsed() < ACTIVITY_WRITE_THROTTLE {
+                self.metrics
+                    .record_client_activity_write_skipped("throttled");
                 return Ok(());
             }
         }
 
         let now = Utc::now().naive_utc();
+        let today = now.date();
         let conn = &mut self.db.get().map_err(|e| {
             error!("client tracking: failed to get DB connection: {:?}", e);
+            self.metrics.record_client_activity_write("error");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Database connection failed",
@@ -81,13 +113,36 @@ impl ClientTrackingService {
         })?;
 
         conn.transaction::<(), diesel::result::Error, _>(|conn| {
-            let existing_uid = clients::table
+            let existing_client = clients::table
                 .find(client_id)
-                .select(clients::last_active_uid)
-                .first::<i32>(conn)
+                .select(ClientRecord::as_select())
+                .first::<ClientRecord>(conn)
+                .optional()?;
+            let existing_user = user_extra::table
+                .find(uid)
+                .select(UserExtra::as_select())
+                .first::<UserExtra>(conn)
                 .optional()?;
 
-            if existing_uid.is_some_and(|previous_uid| previous_uid != uid) {
+            let active_client_delta = i64::from(
+                existing_client
+                    .as_ref()
+                    .is_none_or(|client| client.last_active.date() != today),
+            );
+            let new_client_delta = i64::from(existing_client.is_none());
+            let active_user_delta = i64::from(
+                existing_user
+                    .as_ref()
+                    .is_none_or(|user| user.last_seen_at.date() != today),
+            );
+            let new_user_delta = i64::from(existing_user.is_none());
+            let rebind_delta = i64::from(
+                existing_client
+                    .as_ref()
+                    .is_some_and(|client| client.last_active_uid != uid),
+            );
+
+            if rebind_delta > 0 {
                 diesel::update(
                     push_subscriptions::table
                         .filter(push_subscriptions::client_id.eq(Some(client_id.to_string()))),
@@ -98,7 +153,9 @@ impl ClientTrackingService {
 
             let new_client = NewClientRecord {
                 client_id: client_id.to_string(),
-                created_at: now,
+                created_at: existing_client
+                    .as_ref()
+                    .map_or(now, |client| client.created_at),
                 last_active: now,
                 last_active_uid: uid,
             };
@@ -113,16 +170,49 @@ impl ClientTrackingService {
                 ))
                 .execute(conn)?;
 
+            let new_user = NewUserExtra {
+                uid,
+                first_seen_at: existing_user
+                    .as_ref()
+                    .map_or(now, |user| user.first_seen_at),
+                last_seen_at: now,
+            };
+
+            diesel::insert_into(user_extra::table)
+                .values(&new_user)
+                .on_conflict(user_extra::uid)
+                .do_update()
+                .set(user_extra::last_seen_at.eq(now))
+                .execute(conn)?;
+
+            self.upsert_daily_metrics(
+                conn,
+                DailyMetricDelta {
+                    day: today,
+                    active_users: active_user_delta,
+                    new_users: new_user_delta,
+                    active_clients: active_client_delta,
+                    new_clients: new_client_delta,
+                    client_rebinds: rebind_delta,
+                    stale_clients_purged: 0,
+                    legacy_subscriptions_purged: 0,
+                },
+                now,
+            )?;
+
             Ok(())
         })
         .map_err(|e| {
             error!("client tracking: failed to record activity: {:?}", e);
+            self.metrics.record_client_activity_write("error");
+            self.metrics.record_activity_daily_rollup_update("error");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to record client activity",
             )
         })?;
 
+        self.metrics.record_client_activity_write("success");
         self.recent_writes.insert(
             client_id.to_string(),
             CachedActivity {
@@ -145,14 +235,11 @@ impl ClientTrackingService {
     }
 
     fn purge_stale_subscriptions(&self) -> Result<(), String> {
-        let stale_cutoff = Utc::now()
-            .naive_utc()
+        let now = Utc::now().naive_utc();
+        let today = now.date();
+        let stale_cutoff = now
             .checked_sub_days(Days::new(STALE_CLIENT_RETENTION_DAYS))
             .ok_or_else(|| "failed to compute stale client cutoff".to_string())?;
-        let legacy_cutoff = Utc::now()
-            .naive_utc()
-            .checked_sub_days(Days::new(LEGACY_SUBSCRIPTION_GRACE_DAYS))
-            .ok_or_else(|| "failed to compute legacy subscription cutoff".to_string())?;
 
         let conn = &mut self
             .db
@@ -186,15 +273,26 @@ impl ClientTrackingService {
             }
         }
 
-        let deleted_legacy = diesel::delete(
-            push_subscriptions::table
-                .filter(push_subscriptions::client_id.is_null())
-                .filter(push_subscriptions::created_at.lt(legacy_cutoff)),
+        self.upsert_daily_metrics(
+            conn,
+            DailyMetricDelta {
+                day: today,
+                active_users: 0,
+                new_users: 0,
+                active_clients: 0,
+                new_clients: 0,
+                client_rebinds: 0,
+                stale_clients_purged: deleted_clients as i64,
+                legacy_subscriptions_purged: 0,
+            },
+            now,
         )
-        .execute(conn)
-        .map_err(|e| format!("failed to delete legacy subscriptions: {:?}", e))?;
+        .map_err(|e| format!("failed to update daily purge metrics: {:?}", e))?;
 
-        deleted_subscriptions += deleted_legacy;
+        if deleted_clients > 0 {
+            self.metrics
+                .record_client_tracking_purge("stale_clients", deleted_clients as u64);
+        }
 
         if deleted_subscriptions > 0 || deleted_clients > 0 {
             info!(
@@ -203,6 +301,59 @@ impl ClientTrackingService {
             );
         }
 
+        Ok(())
+    }
+
+    fn upsert_daily_metrics(
+        &self,
+        conn: &mut PgConnection,
+        delta: DailyMetricDelta,
+        now: NaiveDateTime,
+    ) -> Result<(), diesel::result::Error> {
+        if delta.is_zero() {
+            return Ok(());
+        }
+
+        let new_row = NewActivityDailyMetric {
+            day: delta.day,
+            active_users: delta.active_users,
+            new_users: delta.new_users,
+            active_clients: delta.active_clients,
+            new_clients: delta.new_clients,
+            client_rebinds: delta.client_rebinds,
+            stale_clients_purged: delta.stale_clients_purged,
+            legacy_subscriptions_purged: delta.legacy_subscriptions_purged,
+            updated_at: now,
+        };
+
+        diesel::insert_into(activity_daily_metrics::table)
+            .values(&new_row)
+            .on_conflict(activity_daily_metrics::day)
+            .do_update()
+            .set((
+                activity_daily_metrics::active_users
+                    .eq(activity_daily_metrics::active_users + delta.active_users),
+                activity_daily_metrics::new_users
+                    .eq(activity_daily_metrics::new_users + delta.new_users),
+                activity_daily_metrics::active_clients
+                    .eq(activity_daily_metrics::active_clients + delta.active_clients),
+                activity_daily_metrics::new_clients
+                    .eq(activity_daily_metrics::new_clients + delta.new_clients),
+                activity_daily_metrics::client_rebinds
+                    .eq(activity_daily_metrics::client_rebinds + delta.client_rebinds),
+                activity_daily_metrics::stale_clients_purged
+                    .eq(activity_daily_metrics::stale_clients_purged + delta.stale_clients_purged),
+                activity_daily_metrics::legacy_subscriptions_purged
+                    .eq(activity_daily_metrics::legacy_subscriptions_purged
+                        + delta.legacy_subscriptions_purged),
+                activity_daily_metrics::updated_at.eq(now),
+            ))
+            .execute(conn)?;
+
+        self.metrics.record_activity_daily_rollup_update("success");
+        if delta.client_rebinds > 0 {
+            self.metrics.record_client_rebind();
+        }
         Ok(())
     }
 }
@@ -222,4 +373,59 @@ pub async fn track_client_activity(
     }
 
     next.run(request).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn daily_metric_delta_detects_zero_values() {
+        assert!(DailyMetricDelta {
+            day: NaiveDate::from_ymd_opt(2026, 3, 21).unwrap(),
+            active_users: 0,
+            new_users: 0,
+            active_clients: 0,
+            new_clients: 0,
+            client_rebinds: 0,
+            stale_clients_purged: 0,
+            legacy_subscriptions_purged: 0,
+        }
+        .is_zero());
+    }
+
+    #[test]
+    fn daily_metric_delta_detects_non_zero_values() {
+        assert!(!DailyMetricDelta {
+            day: NaiveDate::from_ymd_opt(2026, 3, 21).unwrap(),
+            active_users: 1,
+            new_users: 0,
+            active_clients: 0,
+            new_clients: 0,
+            client_rebinds: 0,
+            stale_clients_purged: 0,
+            legacy_subscriptions_purged: 0,
+        }
+        .is_zero());
+    }
+
+    #[test]
+    fn activity_daily_metric_model_uses_expected_day_type() {
+        let record = crate::models::ActivityDailyMetric {
+            day: NaiveDate::from_ymd_opt(2026, 3, 21).unwrap(),
+            active_users: 1,
+            new_users: 1,
+            active_clients: 1,
+            new_clients: 1,
+            client_rebinds: 0,
+            stale_clients_purged: 0,
+            legacy_subscriptions_purged: 0,
+            updated_at: NaiveDate::from_ymd_opt(2026, 3, 21)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+        };
+
+        assert_eq!(record.day.to_string(), "2026-03-21");
+    }
 }

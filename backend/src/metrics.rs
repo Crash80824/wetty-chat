@@ -27,6 +27,11 @@ pub(crate) struct Metrics {
     discuz_avatar_lookup_users_total: IntCounter,
     ws_messages_pushed_total: IntCounterVec,
     ws_messages_dropped_total: IntCounterVec,
+    client_activity_writes_total: IntCounterVec,
+    client_activity_writes_skipped_total: IntCounterVec,
+    client_rebinds_total: IntCounter,
+    client_tracking_purge_total: IntCounterVec,
+    activity_daily_rollup_updates_total: IntCounterVec,
 }
 
 impl Metrics {
@@ -129,6 +134,43 @@ impl Metrics {
             &["message_type"],
         )
         .expect("ws_messages_dropped_total metric should be valid");
+        let client_activity_writes_total = IntCounterVec::new(
+            opts!(
+                "client_activity_writes_total",
+                "Total number of client activity writes attempted"
+            ),
+            &["result"],
+        )
+        .expect("client_activity_writes_total metric should be valid");
+        let client_activity_writes_skipped_total = IntCounterVec::new(
+            opts!(
+                "client_activity_writes_skipped_total",
+                "Total number of client activity writes skipped"
+            ),
+            &["reason"],
+        )
+        .expect("client_activity_writes_skipped_total metric should be valid");
+        let client_rebinds_total = IntCounter::with_opts(opts!(
+            "client_rebinds_total",
+            "Total number of times a client was rebound to a different user"
+        ))
+        .expect("client_rebinds_total metric should be valid");
+        let client_tracking_purge_total = IntCounterVec::new(
+            opts!(
+                "client_tracking_purge_total",
+                "Total number of client tracking records purged"
+            ),
+            &["kind"],
+        )
+        .expect("client_tracking_purge_total metric should be valid");
+        let activity_daily_rollup_updates_total = IntCounterVec::new(
+            opts!(
+                "activity_daily_rollup_updates_total",
+                "Total number of daily activity rollup updates"
+            ),
+            &["result"],
+        )
+        .expect("activity_daily_rollup_updates_total metric should be valid");
 
         registry
             .register(Box::new(http_requests_total.clone()))
@@ -175,6 +217,21 @@ impl Metrics {
         registry
             .register(Box::new(ws_messages_dropped_total.clone()))
             .expect("ws_messages_dropped_total registration should succeed");
+        registry
+            .register(Box::new(client_activity_writes_total.clone()))
+            .expect("client_activity_writes_total registration should succeed");
+        registry
+            .register(Box::new(client_activity_writes_skipped_total.clone()))
+            .expect("client_activity_writes_skipped_total registration should succeed");
+        registry
+            .register(Box::new(client_rebinds_total.clone()))
+            .expect("client_rebinds_total registration should succeed");
+        registry
+            .register(Box::new(client_tracking_purge_total.clone()))
+            .expect("client_tracking_purge_total registration should succeed");
+        registry
+            .register(Box::new(activity_daily_rollup_updates_total.clone()))
+            .expect("activity_daily_rollup_updates_total registration should succeed");
 
         Self {
             registry,
@@ -193,6 +250,11 @@ impl Metrics {
             discuz_avatar_lookup_users_total,
             ws_messages_pushed_total,
             ws_messages_dropped_total,
+            client_activity_writes_total,
+            client_activity_writes_skipped_total,
+            client_rebinds_total,
+            client_tracking_purge_total,
+            activity_daily_rollup_updates_total,
         }
     }
 
@@ -284,6 +346,34 @@ impl Metrics {
             .with_label_values(&[message_type])
             .inc();
     }
+
+    pub(crate) fn record_client_activity_write(&self, result: &str) {
+        self.client_activity_writes_total
+            .with_label_values(&[result])
+            .inc();
+    }
+
+    pub(crate) fn record_client_activity_write_skipped(&self, reason: &str) {
+        self.client_activity_writes_skipped_total
+            .with_label_values(&[reason])
+            .inc();
+    }
+
+    pub(crate) fn record_client_rebind(&self) {
+        self.client_rebinds_total.inc();
+    }
+
+    pub(crate) fn record_client_tracking_purge(&self, kind: &str, count: u64) {
+        self.client_tracking_purge_total
+            .with_label_values(&[kind])
+            .inc_by(count);
+    }
+
+    pub(crate) fn record_activity_daily_rollup_update(&self, result: &str) {
+        self.activity_daily_rollup_updates_total
+            .with_label_values(&[result])
+            .inc();
+    }
 }
 
 pub(crate) async fn track_http_metrics(
@@ -366,6 +456,11 @@ mod tests {
         metrics.record_discuz_avatar_lookup(2, 0.003, 0.001);
         metrics.record_ws_message_pushed("message");
         metrics.record_ws_message_dropped("message");
+        metrics.record_client_activity_write("success");
+        metrics.record_client_activity_write_skipped("throttled");
+        metrics.record_client_rebind();
+        metrics.record_client_tracking_purge("stale_clients", 2);
+        metrics.record_activity_daily_rollup_update("success");
         let app = Router::new()
             .route("/metrics", get(metrics_handler))
             .with_state(metrics);
@@ -400,6 +495,11 @@ mod tests {
         assert!(body.contains("discuz_avatar_lookup_users_total"));
         assert!(body.contains("ws_messages_pushed_total"));
         assert!(body.contains("ws_messages_dropped_total"));
+        assert!(body.contains("client_activity_writes_total"));
+        assert!(body.contains("client_activity_writes_skipped_total"));
+        assert!(body.contains("client_rebinds_total"));
+        assert!(body.contains("client_tracking_purge_total"));
+        assert!(body.contains("activity_daily_rollup_updates_total"));
     }
 
     #[tokio::test]
@@ -470,6 +570,11 @@ mod tests {
         metrics.record_ws_message_pushed("message");
         metrics.record_ws_message_pushed("message");
         metrics.record_ws_message_dropped("message_updated");
+        metrics.record_client_activity_write("success");
+        metrics.record_client_activity_write_skipped("throttled");
+        metrics.record_client_rebind();
+        metrics.record_client_tracking_purge("legacy_subscriptions", 3);
+        metrics.record_activity_daily_rollup_update("success");
 
         let rendered = metrics.render().expect("metrics should render");
         assert!(rendered.contains("messages_total{chat_id=\"123\"} 1"));
@@ -486,5 +591,10 @@ mod tests {
         assert!(rendered.contains("discuz_avatar_lookup_users_total 3"));
         assert!(rendered.contains("ws_messages_pushed_total{message_type=\"message\"} 2"));
         assert!(rendered.contains("ws_messages_dropped_total{message_type=\"message_updated\"} 1"));
+        assert!(rendered.contains("client_activity_writes_total{result=\"success\"} 1"));
+        assert!(rendered.contains("client_activity_writes_skipped_total{reason=\"throttled\"} 1"));
+        assert!(rendered.contains("client_rebinds_total 1"));
+        assert!(rendered.contains("client_tracking_purge_total{kind=\"legacy_subscriptions\"} 3"));
+        assert!(rendered.contains("activity_daily_rollup_updates_total{result=\"success\"} 1"));
     }
 }

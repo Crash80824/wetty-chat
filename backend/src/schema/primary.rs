@@ -32,6 +32,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    activity_daily_metrics (day) {
+        day -> Date,
+        active_users -> Int8,
+        new_users -> Int8,
+        active_clients -> Int8,
+        new_clients -> Int8,
+        client_rebinds -> Int8,
+        stale_clients_purged -> Int8,
+        legacy_subscriptions_purged -> Int8,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     clients (client_id) {
         #[max_length = 64]
         client_id -> Varchar,
@@ -116,16 +130,26 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    user_extra (uid) {
+        uid -> Int4,
+        first_seen_at -> Timestamp,
+        last_seen_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
 diesel::joinable!(message_reactions -> messages (message_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     attachments,
+    activity_daily_metrics,
     clients,
     group_membership,
     groups,
     message_reactions,
     messages,
     push_subscriptions,
+    user_extra,
 );

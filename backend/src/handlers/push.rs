@@ -38,8 +38,6 @@ async fn post_subscribe(
     State(state): State<AppState>,
     Json(body): Json<SubscribeBody>,
 ) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
-    state.client_tracking.record_activity(uid, &client_id)?;
-
     let conn = &mut state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -94,8 +92,6 @@ async fn post_unsubscribe(
     State(state): State<AppState>,
     Json(body): Json<UnsubscribeBody>,
 ) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
-    state.client_tracking.record_activity(uid, &client_id)?;
-
     let conn = &mut state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,

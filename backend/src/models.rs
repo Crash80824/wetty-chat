@@ -185,6 +185,34 @@ pub struct UpdateGroup {
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::activity_daily_metrics)]
+pub struct ActivityDailyMetric {
+    pub day: chrono::NaiveDate,
+    pub active_users: i64,
+    pub new_users: i64,
+    pub active_clients: i64,
+    pub new_clients: i64,
+    pub client_rebinds: i64,
+    pub stale_clients_purged: i64,
+    pub legacy_subscriptions_purged: i64,
+    pub updated_at: chrono::NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::activity_daily_metrics)]
+pub struct NewActivityDailyMetric {
+    pub day: chrono::NaiveDate,
+    pub active_users: i64,
+    pub new_users: i64,
+    pub active_clients: i64,
+    pub new_clients: i64,
+    pub client_rebinds: i64,
+    pub stale_clients_purged: i64,
+    pub legacy_subscriptions_purged: i64,
+    pub updated_at: chrono::NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
 #[diesel(table_name = schema::clients)]
 pub struct ClientRecord {
     pub client_id: String,
@@ -200,6 +228,22 @@ pub struct NewClientRecord {
     pub created_at: chrono::NaiveDateTime,
     pub last_active: chrono::NaiveDateTime,
     pub last_active_uid: i32,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::user_extra)]
+pub struct UserExtra {
+    pub uid: i32,
+    pub first_seen_at: chrono::NaiveDateTime,
+    pub last_seen_at: chrono::NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::user_extra)]
+pub struct NewUserExtra {
+    pub uid: i32,
+    pub first_seen_at: chrono::NaiveDateTime,
+    pub last_seen_at: chrono::NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]

@@ -153,9 +153,12 @@ async fn main() {
         push_service: services::push::PushService::start(
             pool.clone(),
             ws_registry.clone(),
-            metrics,
+            metrics.clone(),
         ),
-        client_tracking: services::client_tracking::ClientTrackingService::start(pool.clone()),
+        client_tracking: services::client_tracking::ClientTrackingService::start(
+            pool.clone(),
+            metrics.clone(),
+        ),
         s3_client,
         s3_bucket_name,
         s3_attachment_prefix,
