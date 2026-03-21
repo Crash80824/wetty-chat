@@ -31,6 +31,9 @@
   align-items: flex-start;
   gap: 8px;
   max-width: calc(100vw - 32px);
+}
+
+.contentVisible {
   animation: contentScaleIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

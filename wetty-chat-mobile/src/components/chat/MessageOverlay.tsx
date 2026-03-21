@@ -139,7 +139,7 @@ export function MessageOverlay({
     <div className={styles.overlay} onClick={handleBackdropClick}>
       <div
         ref={contentRef}
-        className={`${styles.content} ${isSent ? styles.contentSent : ''}`}
+        className={`${styles.content} ${isSent ? styles.contentSent : ''} ${position ? styles.contentVisible : ''}`}
         style={
           position
             ? { top: position.top, left: position.left }
