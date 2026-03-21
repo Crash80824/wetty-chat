@@ -12,7 +12,7 @@ import { selectChatFontSizeStyle } from '@/store/settingsSlice';
 const URL_REGEX = /(https?:\/\/[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+)/g;
 const TRAILING_PUNCT = /[.,);!?]+$/;
 
-function renderMessageWithLinks(message: string): React.ReactNode[] {
+export function renderMessageWithLinks(message: string): React.ReactNode[] {
   const parts = message.split(URL_REGEX);
   if (parts.length === 1) return [message];
 
@@ -47,7 +47,7 @@ interface ChatBubbleProps {
   swipeDirection?: 'left' | 'right';
   onReply?: () => void;
   onReplyTap?: () => void;
-  onLongPress?: () => void;
+  onLongPress?: (rect: DOMRect) => void;
   onAvatarClick?: () => void;
   replyTo?: {
     senderName: string;
@@ -139,6 +139,7 @@ export function ChatBubble({
   const swiping = useRef(false);
   const directionLocked = useRef<'horizontal' | 'vertical' | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
 
   function clearLongPress() {
     if (longPressTimer.current) {
@@ -157,7 +158,9 @@ export function ChatBubble({
 
     if (onLongPress && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
       longPressTimer.current = setTimeout(() => {
-        onLongPress();
+        if (bubbleRef.current) {
+          onLongPress(bubbleRef.current.getBoundingClientRect());
+        }
       }, 500);
     }
   }
@@ -199,9 +202,9 @@ export function ChatBubble({
   }
 
   function handleContextMenu(e: React.MouseEvent) {
-    if (onLongPress) {
+    if (onLongPress && bubbleRef.current) {
       e.preventDefault();
-      onLongPress();
+      onLongPress(bubbleRef.current.getBoundingClientRect());
     }
   }
 
@@ -249,7 +252,7 @@ export function ChatBubble({
           ) : (
             <div className={styles.avatarSpacer} />
           )}
-          <div className={styles.bubble} style={{ fontSize: chatFontSizeStyle }}>
+          <div ref={bubbleRef} className={styles.bubble} style={{ fontSize: chatFontSizeStyle }}>
             {showName && <div className={styles.senderName}>{senderName}</div>}
             {replyTo && (
               <div

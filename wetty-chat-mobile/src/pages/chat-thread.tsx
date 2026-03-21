@@ -13,11 +13,10 @@ import {
   IonFab,
   IonFabButton,
   useIonToast,
-  useIonActionSheet,
   useIonAlert,
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
-import { settings, chevronDown, people } from 'ionicons/icons';
+import { settings, chevronDown, people, arrowUndo, chatbubbles, createOutline, copyOutline, trashOutline } from 'ionicons/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   getMessages,
@@ -58,6 +57,7 @@ import './chat-thread.scss';
 import { t } from '@lingui/core/macro';
 import { FeatureGate } from '@/components/FeatureGate';
 import { UserProfileModal } from '@/components/chat/UserProfileModal';
+import { MessageOverlay, type MessageOverlayAction } from '@/components/chat/MessageOverlay';
 import { getGroupInfo } from '@/api/group';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
@@ -177,8 +177,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
 
   const [presentToast] = useIonToast();
-  const [presentActionSheet] = useIonActionSheet();
   const [presentAlert] = useIonAlert();
+  const [overlayMessage, setOverlayMessage] = useState<{ message: MessageResponse; sourceRect: DOMRect } | null>(null);
 
   const showToast = useCallback((text: string, duration = 3000) => {
     presentToast({ message: text, duration, position: 'bottom' });
@@ -479,55 +479,87 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       });
   }, [chatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingSession, currentUserId, currentUserName, currentUserAvatarUrl, messageLookup]);
 
-  const onClickChatItem = (messageIndex: number) => {
+  const onClickChatItem = (messageIndex: number, sourceRect: DOMRect) => {
     const msg = messages[messageIndex];
-    const isOwn = msg.sender.uid === currentUserId;
-    presentActionSheet({
-      buttons: [
-        {
-          text: t`Quote`, handler: () => {
-            setReplyingTo(msg);
-          }
-        },
-        ...(!threadId && !msg.thread_info ? [{ text: t`Reply in Thread`, handler: () => { history.push(`/chats/chat/${chatId}/thread/${msg.id}`); } }] : []),
-        ...(isOwn ? [
-          {
-            text: t`Edit`, handler: () => {
-              setReplyingTo(null);
-              setEditingSession({
-                messageId: msg.id,
-                text: msg.message ?? '',
-                attachments: msg.attachments,
-                originalMessage: { ...msg },
-              });
-            }
-          },
-          {
-            text: t`Delete`, role: 'destructive' as const, handler: () => {
-              presentAlert({
-                header: t`Delete Message`,
-                message: t`Are you sure you want to delete this message?`,
-                buttons: [
-                  { text: t`Cancel`, role: 'cancel' as const },
-                  {
-                    text: t`Delete`, role: 'destructive' as const, handler: () => {
-                      const deletedOptimistic = { ...msg, is_deleted: true };
-                      dispatch(messagePatched({ chatId, messageId: msg.id, message: deletedOptimistic }));
-                      deleteMessage(chatId, msg.id).catch((e: any) => {
-                        dispatch(messagePatched({ chatId, messageId: msg.id, message: msg }));
-                        showToast(e.message || t`Failed to delete message`);
-                      });
-                    }
-                  }
-                ]
-              });
-            }
-          }
-        ] : []),
-        { text: t`Cancel`, role: 'cancel' as const, handler: () => { } },
-      ],
-    });
+    setOverlayMessage({ message: msg, sourceRect });
   };
+
+  const overlayActions = useMemo((): MessageOverlayAction[] => {
+    if (!overlayMessage) return [];
+    const msg = overlayMessage.message;
+    const isOwn = msg.sender.uid === currentUserId;
+    const actions: MessageOverlayAction[] = [
+      {
+        key: 'copy',
+        label: t`Copy`,
+        icon: copyOutline,
+        disabled: !navigator.clipboard?.writeText,
+        handler: () => {
+          navigator.clipboard.writeText(msg.message ?? '');
+        },
+      },
+      {
+        key: 'quote',
+        label: t`Quote`,
+        icon: arrowUndo,
+        handler: () => {
+          setReplyingTo(msg);
+        },
+      },
+    ];
+    if (!threadId && !msg.thread_info) {
+      actions.push({
+        key: 'thread',
+        label: t`Reply in Thread`,
+        icon: chatbubbles,
+        handler: () => {
+          history.push(`/chats/chat/${chatId}/thread/${msg.id}`);
+        },
+      });
+    }
+    if (isOwn) {
+      actions.push({
+        key: 'edit',
+        label: t`Edit`,
+        icon: createOutline,
+        handler: () => {
+          setReplyingTo(null);
+          setEditingSession({
+            messageId: msg.id,
+            text: msg.message ?? '',
+            attachments: msg.attachments,
+            originalMessage: { ...msg },
+          });
+        },
+      });
+      actions.push({
+        key: 'delete',
+        label: t`Delete`,
+        icon: trashOutline,
+        role: 'destructive',
+        handler: () => {
+          presentAlert({
+            header: t`Delete Message`,
+            message: t`Are you sure you want to delete this message?`,
+            buttons: [
+              { text: t`Cancel`, role: 'cancel' as const },
+              {
+                text: t`Delete`, role: 'destructive' as const, handler: () => {
+                  const deletedOptimistic = { ...msg, is_deleted: true };
+                  dispatch(messagePatched({ chatId, messageId: msg.id, message: deletedOptimistic }));
+                  deleteMessage(chatId, msg.id).catch((e: any) => {
+                    dispatch(messagePatched({ chatId, messageId: msg.id, message: msg }));
+                    showToast(e.message || t`Failed to delete message`);
+                  });
+                }
+              }
+            ]
+          });
+        },
+      });
+    }
+    return actions;
+  }, [overlayMessage, currentUserId, threadId, chatId, history, dispatch, showToast, presentAlert]);
 
   return (
     <div className="ion-page chat-thread-page">
@@ -611,7 +643,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
                   avatarUrl={msg.sender.avatar_url}
                   onReply={() => setReplyingTo(msg)}
                   onReplyTap={msg.reply_to_message && !msg.reply_to_message?.is_deleted ? () => jumpToMessage(msg.reply_to_message!.id) : undefined}
-                  onLongPress={() => onClickChatItem(index)}
+                  onLongPress={(rect) => onClickChatItem(index, rect)}
                   showName={prevSender !== msg.sender.uid || showDateSeparator}
                   showAvatar={isLastInGroup}
                   timestamp={msg.created_at}
@@ -670,6 +702,27 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         sender={profileSender}
         onDismiss={() => setProfileSender(null)}
       />
+      {overlayMessage && (
+        <MessageOverlay
+          senderName={overlayMessage.message.sender.name ?? `User ${overlayMessage.message.sender.uid}`}
+          message={overlayMessage.message.is_deleted ? t`[Deleted]` : (overlayMessage.message.message ?? '')}
+          isSent={overlayMessage.message.sender.uid === currentUserId}
+          showName={true}
+          timestamp={overlayMessage.message.created_at}
+          edited={overlayMessage.message.is_edited}
+          isConfirmed={!overlayMessage.message.id.startsWith('cg_')}
+          attachments={overlayMessage.message.attachments}
+          replyTo={overlayMessage.message.reply_to_message ? {
+            senderName: overlayMessage.message.reply_to_message.sender.name ?? `User ${overlayMessage.message.reply_to_message.sender.uid}`,
+            message: overlayMessage.message.reply_to_message.message,
+            attachments: overlayMessage.message.reply_to_message.attachments,
+            isDeleted: overlayMessage.message.reply_to_message.is_deleted,
+          } : undefined}
+          sourceRect={overlayMessage.sourceRect}
+          actions={overlayActions}
+          onClose={() => setOverlayMessage(null)}
+        />
+      )}
     </div>
   );
 }
