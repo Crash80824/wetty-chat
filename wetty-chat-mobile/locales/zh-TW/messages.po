@@ -493,7 +493,7 @@ msgstr "正在引用 {0}"
 
 #: src/pages/chat-thread.tsx
 msgid "Reaction Details"
-msgstr "回應詳情"
+msgstr "表情回應詳情"
 
 #: src/components/chat/ChatList.tsx
 msgid "Read"
