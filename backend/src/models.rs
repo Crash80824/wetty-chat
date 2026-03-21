@@ -30,10 +30,18 @@ pub enum MessageType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserGroupInfo {
+    pub group_id: i32,
+    pub chat_group_color: Option<String>,
+    pub chat_group_color_dark: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sender {
     pub uid: i32,
     pub avatar_url: Option<String>,
     pub name: Option<String>,
+    pub user_group: Option<UserGroupInfo>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
@@ -245,6 +253,22 @@ pub struct NewUserExtra {
     pub uid: i32,
     pub first_seen_at: chrono::NaiveDateTime,
     pub last_seen_at: chrono::NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::usergroup_extra)]
+pub struct UserGroupExtra {
+    pub groupid: i32,
+    pub chat_group_color: Option<String>,
+    pub chat_group_color_dark: Option<String>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::usergroup_extra)]
+pub struct NewUserGroupExtra {
+    pub groupid: i32,
+    pub chat_group_color: Option<String>,
+    pub chat_group_color_dark: Option<String>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]

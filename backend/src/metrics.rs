@@ -723,10 +723,18 @@ mod tests {
         assert!(rendered.contains("push_notifications_total{result=\"failure\"} 1"));
         assert!(rendered.contains("push_notification_jobs_total{result=\"success\"} 1"));
         assert!(rendered.contains("push_notification_jobs_total{result=\"failure\"} 1"));
-        assert!(rendered.contains("push_notification_job_duration_seconds_sum{result=\"success\"} 0.2"));
-        assert!(rendered.contains("push_notification_job_duration_seconds_sum{result=\"failure\"} 0.4"));
-        assert!(rendered.contains("push_notification_job_duration_seconds_count{result=\"success\"} 1"));
-        assert!(rendered.contains("push_notification_job_duration_seconds_count{result=\"failure\"} 1"));
+        assert!(
+            rendered.contains("push_notification_job_duration_seconds_sum{result=\"success\"} 0.2")
+        );
+        assert!(
+            rendered.contains("push_notification_job_duration_seconds_sum{result=\"failure\"} 0.4")
+        );
+        assert!(
+            rendered.contains("push_notification_job_duration_seconds_count{result=\"success\"} 1")
+        );
+        assert!(
+            rendered.contains("push_notification_job_duration_seconds_count{result=\"failure\"} 1")
+        );
         assert!(rendered.contains("push_notifications_suppressed_total 1"));
         assert!(rendered.contains("ws_connected_users 1"));
         assert!(rendered.contains("ws_active_connections 1"));

@@ -7,9 +7,9 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use serde::Serialize;
 
-use crate::models::{GroupRole, NewGroupMembership};
+use crate::models::{GroupRole, NewGroupMembership, UserGroupInfo};
 use crate::schema::{self, group_membership};
-use crate::services::user::lookup_user_avatars;
+use crate::services::user::{lookup_user_avatars, lookup_user_profiles};
 use crate::utils::auth::CurrentUid;
 use crate::{AppState, MAX_MEMBERS_LIMIT};
 
@@ -43,6 +43,7 @@ pub struct MemberResponse {
     joined_at: DateTime<Utc>,
     username: Option<String>,
     avatar_url: Option<String>,
+    user_group: Option<UserGroupInfo>,
 }
 
 #[derive(serde::Deserialize)]
@@ -149,10 +150,7 @@ async fn get_members(
         .unwrap_or(MAX_MEMBERS_LIMIT)
         .max(1);
 
-    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
-
     let mut query = group_membership::table
-        .left_join(cm_dsl::common_member.on(gm_dsl::uid.eq(cm_dsl::uid)))
         .filter(gm_dsl::chat_id.eq(chat_id))
         .into_boxed();
 
@@ -160,14 +158,9 @@ async fn get_members(
         query = query.filter(gm_dsl::uid.gt(after));
     }
 
-    let rows: Vec<(i32, GroupRole, DateTime<Utc>, Option<String>)> = query
+    let rows: Vec<(i32, GroupRole, DateTime<Utc>)> = query
         .order_by(gm_dsl::uid.asc())
-        .select((
-            gm_dsl::uid,
-            gm_dsl::role,
-            gm_dsl::joined_at,
-            cm_dsl::username.nullable(),
-        ))
+        .select((gm_dsl::uid, gm_dsl::role, gm_dsl::joined_at))
         .limit(limit + 1)
         .load(conn)
         .map_err(|e| {
@@ -177,16 +170,27 @@ async fn get_members(
 
     let has_more = rows.len() as i64 > limit;
     let page_rows: Vec<_> = rows.into_iter().take(limit as usize).collect();
-    let uids: Vec<i32> = page_rows.iter().map(|(uid, _, _, _)| *uid).collect();
+    let uids: Vec<i32> = page_rows.iter().map(|(uid, _, _)| *uid).collect();
+    let profiles = lookup_user_profiles(conn, &uids).map_err(|e| {
+        tracing::error!("load member profiles: {:?}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load member profiles",
+        )
+    })?;
     let mut avatars = lookup_user_avatars(&state, &uids);
     let members: Vec<MemberResponse> = page_rows
         .into_iter()
-        .map(|(uid, role, joined_at, username)| MemberResponse {
-            avatar_url: avatars.remove(&uid).flatten(),
-            uid,
-            role,
-            joined_at,
-            username,
+        .map(|(uid, role, joined_at)| {
+            let profile = profiles.get(&uid);
+            MemberResponse {
+                avatar_url: avatars.remove(&uid).flatten(),
+                uid,
+                role,
+                joined_at,
+                username: profile.and_then(|profile| profile.username.clone()),
+                user_group: profile.and_then(|profile| profile.user_group.clone()),
+            }
         })
         .collect();
 
@@ -218,19 +222,13 @@ async fn post_add_member(
     // Check if requester is admin
     check_admin_role(conn, chat_id, uid)?;
 
-    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+    let profiles = lookup_user_profiles(conn, &[body.uid]).map_err(|e| {
+        tracing::error!("load target user profile: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+    })?;
+    let profile = profiles.get(&body.uid);
 
-    let username = cm_dsl::common_member
-        .filter(cm_dsl::uid.eq(body.uid))
-        .select(cm_dsl::username)
-        .first::<String>(conn)
-        .optional()
-        .map_err(|e| {
-            tracing::error!("load target user: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?;
-
-    if username.is_none() {
+    if profile.is_none() {
         return Err((StatusCode::BAD_REQUEST, "User not found"));
     }
 
@@ -279,8 +277,9 @@ async fn post_add_member(
             uid: body.uid,
             role,
             joined_at: now,
-            username,
+            username: profile.and_then(|profile| profile.username.clone()),
             avatar_url,
+            user_group: profile.and_then(|profile| profile.user_group.clone()),
         }),
     ))
 }
@@ -385,21 +384,26 @@ async fn patch_member(
     })?;
 
     // Get updated member info
-    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+    let (role, joined_at): (GroupRole, DateTime<Utc>) = group_membership::table
+        .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(target_uid)))
+        .select((gm_dsl::role, gm_dsl::joined_at))
+        .first(conn)
+        .map_err(|e| {
+            tracing::error!("get updated member: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to get updated member",
+            )
+        })?;
 
-    let (role, joined_at, username): (GroupRole, DateTime<Utc>, Option<String>) =
-        group_membership::table
-            .left_join(cm_dsl::common_member.on(gm_dsl::uid.eq(cm_dsl::uid)))
-            .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(target_uid)))
-            .select((gm_dsl::role, gm_dsl::joined_at, cm_dsl::username.nullable()))
-            .first(conn)
-            .map_err(|e| {
-                tracing::error!("get updated member: {:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to get updated member",
-                )
-            })?;
+    let profiles = lookup_user_profiles(conn, &[target_uid]).map_err(|e| {
+        tracing::error!("load updated member profile: {:?}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load updated member profile",
+        )
+    })?;
+    let profile = profiles.get(&target_uid);
 
     let avatar_url = lookup_user_avatars(&state, &[target_uid])
         .remove(&target_uid)
@@ -409,8 +413,9 @@ async fn patch_member(
         uid: target_uid,
         role,
         joined_at,
-        username,
+        username: profile.and_then(|profile| profile.username.clone()),
         avatar_url,
+        user_group: profile.and_then(|profile| profile.user_group.clone()),
     }))
 }
 

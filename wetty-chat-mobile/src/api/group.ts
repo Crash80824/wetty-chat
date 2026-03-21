@@ -1,5 +1,6 @@
 import type { AxiosResponse } from 'axios';
 import apiClient from './client';
+import type { UserGroupInfo } from './messages';
 
 export interface GroupInfoResponse {
   id: string;
@@ -24,6 +25,7 @@ export interface MemberResponse {
   joined_at: string;
   username: string | null;
   avatar_url: string | null;
+  user_group?: UserGroupInfo | null;
 }
 
 export interface ListMembersResponse {

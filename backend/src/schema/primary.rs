@@ -15,6 +15,20 @@ pub mod sql_types {
 }
 
 diesel::table! {
+    activity_daily_metrics (day) {
+        day -> Date,
+        active_users -> Int8,
+        new_users -> Int8,
+        active_clients -> Int8,
+        new_clients -> Int8,
+        client_rebinds -> Int8,
+        stale_clients_purged -> Int8,
+        legacy_subscriptions_purged -> Int8,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     attachments (id) {
         id -> Int8,
         message_id -> Nullable<Int8>,
@@ -28,20 +42,6 @@ diesel::table! {
         file_name -> Varchar,
         width -> Nullable<Int4>,
         height -> Nullable<Int4>,
-    }
-}
-
-diesel::table! {
-    activity_daily_metrics (day) {
-        day -> Date,
-        active_users -> Int8,
-        new_users -> Int8,
-        active_clients -> Int8,
-        new_clients -> Int8,
-        client_rebinds -> Int8,
-        stale_clients_purged -> Int8,
-        legacy_subscriptions_purged -> Int8,
-        updated_at -> Timestamp,
     }
 }
 
@@ -87,6 +87,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    message_reactions (message_id, user_uid, emoji) {
+        message_id -> Int8,
+        user_uid -> Int4,
+        #[max_length = 32]
+        emoji -> Varchar,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::MessageType;
 
@@ -105,16 +115,6 @@ diesel::table! {
         has_attachments -> Bool,
         has_thread -> Bool,
         has_reactions -> Bool,
-    }
-}
-
-diesel::table! {
-    message_reactions (message_id, user_uid, emoji) {
-        message_id -> Int8,
-        user_uid -> Int4,
-        #[max_length = 32]
-        emoji -> Varchar,
-        created_at -> Timestamptz,
     }
 }
 
@@ -139,13 +139,23 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    usergroup_extra (groupid) {
+        groupid -> Int4,
+        #[max_length = 8]
+        chat_group_color -> Nullable<Varchar>,
+        #[max_length = 8]
+        chat_group_color_dark -> Nullable<Varchar>,
+    }
+}
+
 diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
 diesel::joinable!(message_reactions -> messages (message_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    attachments,
     activity_daily_metrics,
+    attachments,
     clients,
     group_membership,
     groups,
@@ -153,4 +163,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     messages,
     push_subscriptions,
     user_extra,
+    usergroup_extra,
 );

@@ -11,7 +11,10 @@ use serde::Serialize;
 use crate::{
     handlers::members::check_membership,
     models::NewMessage,
-    services::{push::PushJob, user::lookup_user_avatars},
+    services::{
+        push::PushJob,
+        user::{lookup_user_avatars, lookup_user_profiles, UserProfile},
+    },
     utils::{auth::CurrentUid, ids},
 };
 use crate::{
@@ -232,17 +235,19 @@ async fn get_chats(
 
     let chats: Vec<ChatListItem> = items_to_process
         .into_iter()
-        .map(|(id, name, last_message_at, unread_count, msg, muted_until)| {
-            let mr = msg.and_then(|m| message_response_map.remove(&m.id));
-            ChatListItem {
-                id,
-                name: Some(name),
-                last_message_at,
-                unread_count,
-                last_message: mr,
-                muted_until,
-            }
-        })
+        .map(
+            |(id, name, last_message_at, unread_count, msg, muted_until)| {
+                let mr = msg.and_then(|m| message_response_map.remove(&m.id));
+                ChatListItem {
+                    id,
+                    name: Some(name),
+                    last_message_at,
+                    unread_count,
+                    last_message: mr,
+                    muted_until,
+                }
+            },
+        )
         .collect();
 
     let next_cursor = has_more.then(|| chats.last().map(|c| c.id)).flatten();
@@ -350,64 +355,45 @@ fn load_username_by_uid(conn: &mut DbConn, uid: i32) -> QueryResult<Option<Strin
         .optional()
 }
 
-fn load_message_usernames(
-    conn: &mut DbConn,
-    message_ids: &[i64],
-) -> QueryResult<std::collections::HashMap<i64, Option<String>>> {
-    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
-
-    if message_ids.is_empty() {
-        return Ok(std::collections::HashMap::new());
-    }
-
-    messages::table
-        .left_join(cm_dsl::common_member.on(messages::sender_uid.eq(cm_dsl::uid)))
-        .filter(messages::id.eq_any(message_ids))
-        .select((messages::id, cm_dsl::username.nullable()))
-        .load::<(i64, Option<String>)>(conn)
-        .map(|rows| rows.into_iter().collect())
-}
-
 fn load_usernames_by_uids(
     conn: &mut DbConn,
     uids: &[i32],
 ) -> std::collections::HashMap<i32, Option<String>> {
-    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
-
-    if uids.is_empty() {
-        return std::collections::HashMap::new();
-    }
-
-    cm_dsl::common_member
-        .filter(cm_dsl::uid.eq_any(uids))
-        .select((cm_dsl::uid, cm_dsl::username))
-        .load::<(i32, String)>(conn)
+    lookup_user_profiles(conn, uids)
         .unwrap_or_default()
         .into_iter()
-        .map(|(uid, name)| (uid, Some(name)))
+        .map(|(uid, profile)| (uid, profile.username))
         .collect()
 }
 
 fn load_reply_messages(
     conn: &mut DbConn,
     reply_ids: &[i64],
-) -> QueryResult<std::collections::HashMap<i64, (Message, Option<String>)>> {
-    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
-
+) -> QueryResult<std::collections::HashMap<i64, Message>> {
     if reply_ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
 
     messages::table
-        .left_join(cm_dsl::common_member.on(messages::sender_uid.eq(cm_dsl::uid)))
         .filter(messages::id.eq_any(reply_ids))
-        .select((Message::as_select(), cm_dsl::username.nullable()))
-        .load::<(Message, Option<String>)>(conn)
-        .map(|rows| {
-            rows.into_iter()
-                .map(|(msg, username)| (msg.id, (msg, username)))
-                .collect()
-        })
+        .select(Message::as_select())
+        .load::<Message>(conn)
+        .map(|rows| rows.into_iter().map(|msg| (msg.id, msg)).collect())
+}
+
+fn build_sender(
+    uid: i32,
+    user_avatars: &std::collections::HashMap<i32, Option<String>>,
+    user_profiles: &std::collections::HashMap<i32, UserProfile>,
+) -> Sender {
+    let profile = user_profiles.get(&uid);
+
+    Sender {
+        uid,
+        avatar_url: user_avatars.get(&uid).cloned().flatten(),
+        name: profile.and_then(|profile| profile.username.clone()),
+        user_group: profile.and_then(|profile| profile.user_group.clone()),
+    }
 }
 
 /// Attach reply_to_message to a list of messages by fetching referenced messages in one query.
@@ -423,18 +409,18 @@ pub async fn attach_metadata(
         .collect();
 
     let message_ids: Vec<i64> = messages_to_process.iter().map(|m| m.id).collect();
-    let sender_names_by_message_id = load_message_usernames(conn, &message_ids).unwrap_or_default();
     let reply_messages_map = load_reply_messages(conn, &reply_ids).unwrap_or_default();
 
     let mut avatar_uids = std::collections::HashSet::new();
     for m in &messages_to_process {
         avatar_uids.insert(m.sender_uid);
     }
-    for (reply_msg, _) in reply_messages_map.values() {
+    for reply_msg in reply_messages_map.values() {
         avatar_uids.insert(reply_msg.sender_uid);
     }
     let target_uids: Vec<i32> = avatar_uids.into_iter().collect();
     let user_avatars = lookup_user_avatars(state, &target_uids);
+    let user_profiles = lookup_user_profiles(conn, &target_uids).unwrap_or_default();
 
     let mut message_attachments_map: std::collections::HashMap<i64, Vec<Attachment>> =
         std::collections::HashMap::new();
@@ -564,24 +550,18 @@ pub async fn attach_metadata(
     let mut responses = Vec::with_capacity(messages_to_process.len());
     for m in messages_to_process {
         let reply_to_message = m.reply_to_id.and_then(|reply_id| {
-            reply_messages_map
-                .get(&reply_id)
-                .map(|(reply_msg, reply_username)| {
-                    Box::new(ReplyToMessage {
-                        id: reply_msg.id,
-                        message: if reply_msg.deleted_at.is_some() {
-                            None
-                        } else {
-                            reply_msg.message.clone()
-                        },
-                        sender: Sender {
-                            uid: reply_msg.sender_uid,
-                            avatar_url: user_avatars.get(&reply_msg.sender_uid).cloned().flatten(),
-                            name: reply_username.clone(),
-                        },
-                        is_deleted: reply_msg.deleted_at.is_some(),
-                    })
+            reply_messages_map.get(&reply_id).map(|reply_msg| {
+                Box::new(ReplyToMessage {
+                    id: reply_msg.id,
+                    message: if reply_msg.deleted_at.is_some() {
+                        None
+                    } else {
+                        reply_msg.message.clone()
+                    },
+                    sender: build_sender(reply_msg.sender_uid, &user_avatars, &user_profiles),
+                    is_deleted: reply_msg.deleted_at.is_some(),
                 })
+            })
         });
 
         let mut attachments = Vec::new();
@@ -614,11 +594,7 @@ pub async fn attach_metadata(
             message_type: m.message_type,
             reply_root_id: m.reply_root_id,
             client_generated_id: m.client_generated_id,
-            sender: Sender {
-                uid: m.sender_uid,
-                avatar_url: user_avatars.get(&m.sender_uid).cloned().flatten(),
-                name: sender_names_by_message_id.get(&m.id).cloned().flatten(),
-            },
+            sender: build_sender(m.sender_uid, &user_avatars, &user_profiles),
             chat_id: m.chat_id,
             created_at: m.created_at,
             is_edited: m.updated_at.is_some(),

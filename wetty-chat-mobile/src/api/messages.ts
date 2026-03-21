@@ -1,10 +1,17 @@
 import type { AxiosResponse } from 'axios';
 import apiClient from './client';
 
+export interface UserGroupInfo {
+  group_id: number;
+  chat_group_color?: string | null;
+  chat_group_color_dark?: string | null;
+}
+
 export interface Sender {
   uid: number;
-  avatar_url?: string,
+  avatar_url?: string;
   name: string | null;
+  user_group?: UserGroupInfo | null;
 }
 
 export interface ReplyToMessage {

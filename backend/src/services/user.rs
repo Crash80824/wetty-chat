@@ -1,7 +1,14 @@
-use crate::{AppState, AuthMethod};
+use crate::{models::UserGroupInfo, AppState, AuthMethod};
+use diesel::prelude::*;
 use std::collections::HashMap;
 use std::time::Instant;
 use std::time::UNIX_EPOCH;
+
+#[derive(Debug, Clone)]
+pub struct UserProfile {
+    pub username: Option<String>,
+    pub user_group: Option<UserGroupInfo>,
+}
 
 pub fn lookup_user_avatars(state: &AppState, uids: &[i32]) -> HashMap<i32, Option<String>> {
     let (public_url, avatar_path) = match (
@@ -40,4 +47,47 @@ pub fn lookup_user_avatars(state: &AppState, uids: &[i32]) -> HashMap<i32, Optio
         fs_duration_seconds,
     );
     map
+}
+
+pub fn lookup_user_profiles(
+    conn: &mut diesel::PgConnection,
+    uids: &[i32],
+) -> QueryResult<HashMap<i32, UserProfile>> {
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+    use crate::schema::usergroup_extra::dsl as uge_dsl;
+
+    if uids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows: Vec<(i32, String, i32, Option<String>, Option<String>)> = cm_dsl::common_member
+        .left_join(uge_dsl::usergroup_extra.on(cm_dsl::groupid.eq(uge_dsl::groupid)))
+        .filter(cm_dsl::uid.eq_any(uids))
+        .select((
+            cm_dsl::uid,
+            cm_dsl::username,
+            cm_dsl::groupid,
+            uge_dsl::chat_group_color.nullable(),
+            uge_dsl::chat_group_color_dark.nullable(),
+        ))
+        .load(conn)?;
+
+    Ok(rows
+        .into_iter()
+        .map(
+            |(uid, username, group_id, chat_group_color, chat_group_color_dark)| {
+                (
+                    uid,
+                    UserProfile {
+                        username: Some(username),
+                        user_group: Some(UserGroupInfo {
+                            group_id,
+                            chat_group_color,
+                            chat_group_color_dark,
+                        }),
+                    },
+                )
+            },
+        )
+        .collect())
 }
