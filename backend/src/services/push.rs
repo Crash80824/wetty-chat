@@ -1,8 +1,10 @@
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
+use futures::future::FutureExt;
 use futures::stream::{self, StreamExt};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 use web_push::{HyperWebPushClient, WebPushClient};
@@ -21,6 +23,7 @@ const PUSH_CONCURRENCY: usize = 10;
 /// Channel buffer size for pending push jobs.
 const CHANNEL_BUFFER: usize = 1024;
 const PUSH_SUPPRESSION_FRESHNESS_SECS: u64 = 30;
+const PUSH_WORKER_RESTART_DELAY: Duration = Duration::from_secs(1);
 
 /// A push notification job enqueued when a new message is created.
 #[derive(Debug, Clone)]
@@ -74,10 +77,10 @@ impl PushService {
             job_tx: tx,
         });
 
-        // Spawn the background worker.
+        // Spawn the background worker supervisor.
         let worker_service = service.clone();
         tokio::spawn(async move {
-            run_push_worker(rx, worker_service, db, ws_registry).await;
+            supervise_push_worker(rx, worker_service, db, ws_registry).await;
         });
 
         service
@@ -159,12 +162,42 @@ impl PushService {
     }
 }
 
-/// Background worker that processes push notification jobs.
-async fn run_push_worker(
+async fn supervise_push_worker(
     mut rx: mpsc::Receiver<PushJob>,
     service: Arc<PushService>,
     db: Pool<ConnectionManager<PgConnection>>,
     ws_registry: Arc<ConnectionRegistry>,
+) {
+    loop {
+        let worker_result =
+            std::panic::AssertUnwindSafe(run_push_worker(&mut rx, &service, &db, &ws_registry))
+                .catch_unwind()
+                .await;
+
+        match worker_result {
+            Ok(()) => {
+                info!("Push notification worker stopped (channel closed)");
+                return;
+            }
+            Err(payload) => {
+                let panic_message = panic_payload_message(payload.as_ref());
+                error!(
+                    "Push notification worker panicked; restarting in {}s: {}",
+                    PUSH_WORKER_RESTART_DELAY.as_secs(),
+                    panic_message
+                );
+                tokio::time::sleep(PUSH_WORKER_RESTART_DELAY).await;
+            }
+        }
+    }
+}
+
+/// Background worker that processes push notification jobs.
+async fn run_push_worker(
+    rx: &mut mpsc::Receiver<PushJob>,
+    service: &Arc<PushService>,
+    db: &Pool<ConnectionManager<PgConnection>>,
+    ws_registry: &Arc<ConnectionRegistry>,
 ) {
     info!("Push notification worker started");
 
@@ -173,6 +206,9 @@ async fn run_push_worker(
             "Processing push job: chat_id={} sender_uid={} message_id={}",
             job.chat_id, job.sender_uid, job.message_id
         );
+
+        #[cfg(test)]
+        maybe_panic_for_test(&job);
 
         let conn = match db.get() {
             Ok(c) => c,
@@ -189,8 +225,6 @@ async fn run_push_worker(
             );
         }
     }
-
-    info!("Push notification worker stopped (channel closed)");
 }
 
 /// Process a single push job: load subscriptions, filter online users, send, cleanup.
@@ -260,17 +294,7 @@ async fn process_push_job(
         });
 
     // 4. Build the push payload base text.
-    let body_text = match &job.message_preview {
-        Some(preview) => {
-            let truncated = if preview.len() > MESSAGE_PREVIEW_MAX {
-                format!("{}…", &preview[..MESSAGE_PREVIEW_MAX])
-            } else {
-                preview.clone()
-            };
-            format!("{}: {}", job.sender_username, truncated)
-        }
-        None => format!("{} sent a message", job.sender_username),
-    };
+    let body_text = format_push_body(&job.sender_username, job.message_preview.as_deref());
 
     // 5. Send concurrently with bounded parallelism.
     let stale_endpoints: Vec<String> = stream::iter(subs.into_iter())
@@ -320,4 +344,130 @@ async fn process_push_job(
     }
 
     Ok(())
+}
+
+fn format_push_body(sender_username: &str, preview: Option<&str>) -> String {
+    match preview {
+        Some(preview) => format!("{}: {}", sender_username, truncate_preview(preview)),
+        None => format!("{} sent a message", sender_username),
+    }
+}
+
+fn truncate_preview(preview: &str) -> String {
+    let truncated: String = preview.chars().take(MESSAGE_PREVIEW_MAX).collect();
+    if preview.chars().count() > MESSAGE_PREVIEW_MAX {
+        format!("{truncated}…")
+    } else {
+        truncated
+    }
+}
+
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "non-string panic payload".to_string()
+    }
+}
+
+#[cfg(test)]
+fn maybe_panic_for_test(job: &PushJob) {
+    if job.message_id == TEST_PANIC_MESSAGE_ID.load(std::sync::atomic::Ordering::SeqCst) {
+        panic!("test-induced push worker panic");
+    }
+}
+
+#[cfg(test)]
+static TEST_PANIC_MESSAGE_ID: std::sync::atomic::AtomicI64 =
+    std::sync::atomic::AtomicI64::new(i64::MIN);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn truncate_preview_keeps_short_ascii() {
+        assert_eq!(truncate_preview("hello"), "hello");
+    }
+
+    #[test]
+    fn truncate_preview_adds_ellipsis_for_long_ascii() {
+        let input = "a".repeat(MESSAGE_PREVIEW_MAX + 5);
+        let expected = format!("{}…", "a".repeat(MESSAGE_PREVIEW_MAX));
+        assert_eq!(truncate_preview(&input), expected);
+    }
+
+    #[test]
+    fn truncate_preview_handles_multibyte_unicode_without_panicking() {
+        let input = "不用注册tg之后感觉加群的奇怪的人会更多，感觉要考虑下禁止事项和惩罚措施了（）";
+        assert_eq!(truncate_preview(input), input);
+    }
+
+    #[test]
+    fn truncate_preview_exact_limit_has_no_ellipsis() {
+        let input = "a".repeat(MESSAGE_PREVIEW_MAX);
+        assert_eq!(truncate_preview(&input), input);
+    }
+
+    #[test]
+    fn format_push_body_uses_fallback_for_missing_preview() {
+        assert_eq!(format_push_body("alice", None), "alice sent a message");
+    }
+
+    #[tokio::test]
+    async fn supervisor_restarts_after_panic() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let worker_attempts = attempts.clone();
+        let (done_tx, mut done_rx) = mpsc::channel::<usize>(1);
+
+        tokio::spawn(async move {
+            supervise_worker("test worker", Duration::from_millis(1), move || {
+                let worker_attempts = worker_attempts.clone();
+                let done_tx = done_tx.clone();
+                async move {
+                    let attempt = worker_attempts.fetch_add(1, Ordering::SeqCst) + 1;
+                    if attempt == 1 {
+                        panic!("boom");
+                    }
+                    done_tx.send(attempt).await.unwrap();
+                }
+            })
+            .await;
+        });
+
+        let attempt = tokio::time::timeout(Duration::from_secs(1), done_rx.recv())
+            .await
+            .expect("supervisor should finish the restarted attempt")
+            .expect("channel should remain open");
+
+        assert_eq!(attempt, 2);
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    }
+}
+
+async fn supervise_worker<F, Fut>(worker_name: &str, restart_delay: Duration, mut worker: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    loop {
+        let worker_result = std::panic::AssertUnwindSafe(worker()).catch_unwind().await;
+
+        match worker_result {
+            Ok(()) => return,
+            Err(payload) => {
+                let panic_message = panic_payload_message(payload.as_ref());
+                error!(
+                    "{} panicked; restarting in {}s: {}",
+                    worker_name,
+                    restart_delay.as_secs_f32(),
+                    panic_message
+                );
+                tokio::time::sleep(restart_delay).await;
+            }
+        }
+    }
 }

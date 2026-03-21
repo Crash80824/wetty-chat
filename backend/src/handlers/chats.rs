@@ -534,17 +534,15 @@ pub async fn attach_metadata(
 
         for (msg_id, emoji, count) in counts {
             let reacted_by_me = Some(my_reactions.contains(&(msg_id, emoji.clone())));
-            let reactors = reactor_uids_map
-                .get(&(msg_id, emoji.clone()))
-                .map(|uids| {
-                    uids.iter()
-                        .map(|&uid| ReactionReactor {
-                            uid,
-                            name: reactor_names.get(&uid).cloned().flatten(),
-                            avatar_url: reactor_avatars.get(&uid).cloned().flatten(),
-                        })
-                        .collect()
-                });
+            let reactors = reactor_uids_map.get(&(msg_id, emoji.clone())).map(|uids| {
+                uids.iter()
+                    .map(|&uid| ReactionReactor {
+                        uid,
+                        name: reactor_names.get(&uid).cloned().flatten(),
+                        avatar_url: reactor_avatars.get(&uid).cloned().flatten(),
+                    })
+                    .collect()
+            });
             reaction_summaries_map
                 .entry(msg_id)
                 .or_default()
@@ -1477,12 +1475,7 @@ fn validate_emoji(input: &str) -> Result<String, (StatusCode, &'static str)> {
     Ok(input.to_string())
 }
 
-fn broadcast_reaction_update(
-    conn: &mut DbConn,
-    state: &AppState,
-    chat_id: i64,
-    message_id: i64,
-) {
+fn broadcast_reaction_update(conn: &mut DbConn, state: &AppState, chat_id: i64, message_id: i64) {
     let counts: Vec<(String, i64)> = message_reactions::table
         .filter(message_reactions::message_id.eq(message_id))
         .group_by(message_reactions::emoji)
@@ -1768,10 +1761,7 @@ pub fn router() -> Router<crate::AppState> {
                             "/{message_id}",
                             get(get_message).patch(patch_message).delete(delete_message),
                         )
-                        .route(
-                            "/{message_id}/reactions",
-                            get(get_reaction_details),
-                        )
+                        .route("/{message_id}/reactions", get(get_reaction_details))
                         .route(
                             "/{message_id}/reactions/{emoji}",
                             put(put_reaction).delete(delete_reaction),
