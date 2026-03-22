@@ -39,9 +39,9 @@ export function createBaseConfig(options: BaseConfigOptions = {}) {
         registerType: 'prompt',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
-          name: 'Wetty Chat',
-          short_name: 'W Chat',
-          description: 'Wetty Chat',
+          name: '茶话',
+          short_name: '茶话',
+          description: '一边喝茶一边聊天吧',
           theme_color: '#f7f7f7',
           background_color: '#fbf9e9',
           display: 'standalone',
