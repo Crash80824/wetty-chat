@@ -25,7 +25,10 @@ export function createBaseConfig(options: BaseConfigOptions = {}) {
       }
     },
     plugins: [
-      patchCssModules(),
+      patchCssModules({
+        generateSourceTypes: true,
+        declarationMap: true,
+      }),
       react({
         babel: {
           plugins: ["@lingui/babel-plugin-lingui-macro"],
