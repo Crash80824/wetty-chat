@@ -3,7 +3,7 @@ import { IonModal, IonContent, IonIcon } from '@ionic/react';
 import { close } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import { getReactionDetails, type ReactionReactor } from '@/api/messages';
-import { useIsDesktop } from '@/hooks/useIsDesktop';
+import { useIsDesktop } from '@/hooks/platformHooks';
 import { UserAvatar } from '@/components/UserAvatar';
 
 interface ReactionGroup {

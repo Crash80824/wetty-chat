@@ -15,7 +15,7 @@ import { getCurrentUserId } from './js/current-user';
 import { t } from '@lingui/core/macro';
 import MobileLayout from './layouts/MobileLayout';
 import { AppUpdateProvider } from './hooks/AppUpdateProvider';
-import { useIsDesktop } from './hooks/useIsDesktop';
+import { useIsDesktop } from './hooks/platformHooks';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useAppUpdate } from './hooks/useAppUpdate';
 import { DesktopSplitLayout } from './layouts/DesktopSplitLayout';

@@ -2,8 +2,8 @@ import { IonModal, IonContent, IonIcon, IonChip, IonLabel } from '@ionic/react';
 import { close } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import type { Sender } from '@/api/messages';
-import { useIsDarkMode } from '@/hooks/useIsDarkMode';
-import { useIsDesktop } from '@/hooks/useIsDesktop';
+import { useIsDarkMode } from '@/hooks/platformHooks';
+import { useIsDesktop } from '@/hooks/platformHooks';
 import { UserAvatar } from '@/components/UserAvatar';
 import { FeatureGate } from '../FeatureGate';
 

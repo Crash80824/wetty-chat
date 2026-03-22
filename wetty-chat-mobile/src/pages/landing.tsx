@@ -23,6 +23,7 @@ import {
 } from 'ionicons/icons';
 import './landing.scss';
 import { Redirect, useLocation } from 'react-router';
+import { useIsPWA } from '@/hooks/platformHooks';
 import { syncJwtTokenFromLanding } from '@/utils/jwtToken';
 
 type PlatformId = 'android' | 'ios' | 'windows' | 'macos' | 'linux';
@@ -79,7 +80,7 @@ const detectPlatform = (): PlatformId => {
 
 export default function LandingPage() {
     const detectedPlatform = detectPlatform();
-    const isPwa = isPlatform('pwa');
+    const isPwa = useIsPWA();
     const [selectedPlatform, setSelectedPlatform] = useState<PlatformId>(detectedPlatform);
     const location = useLocation();
 

@@ -10,7 +10,7 @@ import {
   download,
   expandOutline,
 } from 'ionicons/icons';
-import { useIsDesktop } from '@/hooks/useIsDesktop';
+import { useIsDesktop } from '@/hooks/platformHooks';
 import styles from './ImageViewer.module.scss';
 
 const MAX_SCALE = 5;
@@ -77,18 +77,18 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
   const resetOnNextScaleRef = useRef(true);
   const touchStateRef = useRef<
     | {
-        mode: 'swipe' | 'pan';
-        startPoint: Point;
-        startTranslate: Point;
-        deltaX: number;
-        deltaY: number;
-      }
+      mode: 'swipe' | 'pan';
+      startPoint: Point;
+      startTranslate: Point;
+      deltaX: number;
+      deltaY: number;
+    }
     | {
-        mode: 'pinch';
-        startDistance: number;
-        startScale: number;
-        contentPoint: Point;
-      }
+      mode: 'pinch';
+      startDistance: number;
+      startScale: number;
+      contentPoint: Point;
+    }
     | null
   >(null);
   const activeImage = images[activeIndex];
@@ -463,7 +463,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
       };
       const nextScale = clamp(
         (touchStateRef.current.startScale * distance(first, second)) /
-          touchStateRef.current.startDistance,
+        touchStateRef.current.startDistance,
         1,
         MAX_SCALE
       );
