@@ -8,6 +8,10 @@ import { patchCssModules } from 'vite-css-modules';
 const SRC_DIR = path.resolve(__dirname, './src');
 
 export default defineConfig({
+  define: {
+    __API_BASE__: JSON.stringify(null),
+    __AUTH_REDIRECT_URL__: JSON.stringify(null),
+  },
   css: {
     modules: {
       localsConvention: "camelCase",

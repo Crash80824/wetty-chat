@@ -9,7 +9,8 @@ import { getStoredJwtToken } from '@/utils/jwtToken';
  * - Production: VITE_API_BASE_URL (must be set in build env).
  */
 
-const apiClient = axios.create({ baseURL: import.meta.env.BASE_URL + '_api' });
+
+const apiClient = axios.create({ baseURL: __API_BASE__ ?? (import.meta.env.BASE_URL + '_api') });
 
 apiClient.interceptors.request.use((config) => {
   config.headers['X-Client-Id'] = getOrCreateClientId();
