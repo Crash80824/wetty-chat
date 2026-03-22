@@ -1,6 +1,12 @@
 // @generated automatically by Diesel CLI.
 
 pub mod discuz {
+    pub mod sql_types {
+        #[derive(diesel::sql_types::SqlType)]
+        #[diesel(postgres_type(name = "common_usergroup_type", schema = "discuz"))]
+        pub struct CommonUsergroupType;
+    }
+
     diesel::table! {
         discuz.common_member (uid) {
             uid -> Int4,
@@ -38,4 +44,37 @@ pub mod discuz {
             freeze -> Int2,
         }
     }
+
+    diesel::table! {
+        use diesel::sql_types::*;
+        use super::sql_types::CommonUsergroupType;
+
+        discuz.common_usergroup (groupid) {
+            groupid -> Int4,
+            radminid -> Int2,
+            #[sql_name = "type"]
+            type_ -> CommonUsergroupType,
+            #[max_length = 255]
+            system -> Varchar,
+            #[max_length = 255]
+            grouptitle -> Varchar,
+            creditshigher -> Int4,
+            creditslower -> Int4,
+            stars -> Int2,
+            #[max_length = 255]
+            color -> Varchar,
+            #[max_length = 255]
+            icon -> Varchar,
+            allowvisit -> Int2,
+            allowsendpm -> Int2,
+            allowinvite -> Int2,
+            allowmailinvite -> Int2,
+            allowfollow -> Int2,
+            maxinvitenum -> Int2,
+            inviteprice -> Int4,
+            maxinviteday -> Int4,
+        }
+    }
+
+    diesel::allow_tables_to_appear_in_same_query!(common_member, common_usergroup,);
 }

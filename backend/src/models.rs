@@ -32,6 +32,7 @@ pub enum MessageType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserGroupInfo {
     pub group_id: i32,
+    pub name: Option<String>,
     pub chat_group_color: Option<String>,
     pub chat_group_color_dark: Option<String>,
 }

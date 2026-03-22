@@ -3,6 +3,7 @@ import apiClient from './client';
 
 export interface UserGroupInfo {
   group_id: number;
+  name?: string | null;
   chat_group_color?: string | null;
   chat_group_color_dark?: string | null;
 }

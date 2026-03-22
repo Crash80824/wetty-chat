@@ -54,19 +54,29 @@ pub fn lookup_user_profiles(
     uids: &[i32],
 ) -> QueryResult<HashMap<i32, UserProfile>> {
     use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+    use crate::schema::discuz::discuz::common_usergroup::dsl as cug_dsl;
     use crate::schema::usergroup_extra::dsl as uge_dsl;
 
     if uids.is_empty() {
         return Ok(HashMap::new());
     }
 
-    let rows: Vec<(i32, String, i32, Option<String>, Option<String>)> = cm_dsl::common_member
+    let rows: Vec<(
+        i32,
+        String,
+        i32,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    )> = cm_dsl::common_member
+        .left_join(cug_dsl::common_usergroup.on(cm_dsl::groupid.eq(cug_dsl::groupid)))
         .left_join(uge_dsl::usergroup_extra.on(cm_dsl::groupid.eq(uge_dsl::groupid)))
         .filter(cm_dsl::uid.eq_any(uids))
         .select((
             cm_dsl::uid,
             cm_dsl::username,
             cm_dsl::groupid,
+            cug_dsl::grouptitle.nullable(),
             uge_dsl::chat_group_color.nullable(),
             uge_dsl::chat_group_color_dark.nullable(),
         ))
@@ -75,13 +85,14 @@ pub fn lookup_user_profiles(
     Ok(rows
         .into_iter()
         .map(
-            |(uid, username, group_id, chat_group_color, chat_group_color_dark)| {
+            |(uid, username, group_id, group_name, chat_group_color, chat_group_color_dark)| {
                 (
                     uid,
                     UserProfile {
                         username: Some(username),
                         user_group: Some(UserGroupInfo {
                             group_id,
+                            name: group_name,
                             chat_group_color,
                             chat_group_color_dark,
                         }),

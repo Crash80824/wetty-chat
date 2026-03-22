@@ -1,7 +1,8 @@
-import { IonModal, IonContent, IonIcon } from '@ionic/react';
+import { IonModal, IonContent, IonIcon, IonChip, IonLabel } from '@ionic/react';
 import { close } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import type { Sender } from '@/api/messages';
+import { useIsDarkMode } from '@/hooks/useIsDarkMode';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { UserAvatar } from '@/components/UserAvatar';
 import { FeatureGate } from '../FeatureGate';
@@ -13,7 +14,12 @@ interface UserProfileModalProps {
 
 export function UserProfileModal({ sender, onDismiss }: UserProfileModalProps) {
   const isDesktop = useIsDesktop();
+  const isDarkMode = useIsDarkMode();
   const displayName = sender?.name ?? (sender ? `User ${sender.uid}` : '');
+  const groupName = sender?.user_group?.name?.trim() || null;
+  const groupNameColor = isDarkMode
+    ? (sender?.user_group?.chat_group_color_dark || sender?.user_group?.chat_group_color || undefined)
+    : (sender?.user_group?.chat_group_color || undefined);
 
   return (
     <IonModal
@@ -43,6 +49,22 @@ export function UserProfileModal({ sender, onDismiss }: UserProfileModalProps) {
               style={{ display: 'inline-flex' }}
             />
             <h2>{displayName}</h2>
+            {groupName && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginTop: 4,
+                }}
+              >
+                <IonChip
+                  outline
+                  style={groupNameColor ? { color: groupNameColor, borderColor: groupNameColor } : undefined}
+                >
+                  <IonLabel>{groupName}</IonLabel>
+                </IonChip>
+              </div>
+            )}
             <FeatureGate>
               <p style={{ color: 'var(--ion-color-medium)' }}>UID: {sender.uid}</p>
             </FeatureGate>
