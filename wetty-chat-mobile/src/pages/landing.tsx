@@ -12,7 +12,7 @@ import {
     IonTitle,
     IonToolbar,
 } from '@ionic/react';
-import {type ReactNode, useEffect, useState} from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
     ellipsisHorizontal,
     ellipsisVertical,
@@ -22,29 +22,29 @@ import {
     menuOutline, shareOutline
 } from 'ionicons/icons';
 import './landing.scss';
-import { useLocation } from 'react-router';
+import { Redirect, useLocation } from 'react-router';
 import { syncJwtTokenFromLanding } from '@/utils/jwtToken';
 
 type PlatformId = 'android' | 'ios' | 'windows' | 'macos' | 'linux';
 
 const platformOptions: Array<{ id: PlatformId; label: string }> = [
-    {id: 'android', label: 'Android'},
-    {id: 'ios', label: 'iOS'},
-    {id: 'windows', label: 'Windows'},
-    {id: 'macos', label: 'macOS'},
-    {id: 'linux', label: 'Linux'},
+    { id: 'android', label: 'Android' },
+    { id: 'ios', label: 'iOS' },
+    { id: 'windows', label: 'Windows' },
+    { id: 'macos', label: 'macOS' },
+    { id: 'linux', label: 'Linux' },
 ];
 
 function IconText({
-                        icon,
-                        children,
-                    }: {
+    icon,
+    children,
+}: {
     icon: string;
     children: ReactNode;
 }) {
     return (
         <span className="landing-inline-text">
-            <IonIcon icon={icon} className="landing-inline-text__icon"/>
+            <IonIcon icon={icon} className="landing-inline-text__icon" />
             <span>{children}</span>
         </span>
     );
@@ -79,6 +79,7 @@ const detectPlatform = (): PlatformId => {
 
 export default function LandingPage() {
     const detectedPlatform = detectPlatform();
+    const isPwa = isPlatform('pwa');
     const [selectedPlatform, setSelectedPlatform] = useState<PlatformId>(detectedPlatform);
     const location = useLocation();
 
@@ -98,6 +99,9 @@ export default function LandingPage() {
                     <div className="landing-hero__copy">
                         <h1>把 Wetty Chat 添加到主屏幕</h1>
                         <p>安装后可以像原生应用一样从桌面直接启动。</p>
+                        {isPwa && (
+                            <Redirect to="/" />
+                        )}
                     </div>
                 </section>
 
@@ -144,7 +148,7 @@ export default function LandingPage() {
                                     <p className="landing-note">如果浏览器主动弹出了安装界面，直接点安装即可。</p>
                                     <p className="landing-note">
                                         如果无法使用 Chrome，也可以用 <IconText icon={logoEdge}>Edge 浏览器</IconText>
-                                        <br/>
+                                        <br />
                                         点击 <IconText icon={menuOutline}>菜单</IconText>，选择“添加至手机” (可能会在第二页)。
                                     </p>
                                 </IonText>
