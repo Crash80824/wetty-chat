@@ -44,7 +44,7 @@ export function createBaseConfig(options: BaseConfigOptions = {}) {
         manifest: {
           name: '茶话',
           short_name: '茶话',
-          description: '一边喝茶一边聊天吧',
+          description: '一边喝着茶，一边悠闲聊聊天吧。',
           theme_color: '#f7f7f7',
           background_color: '#f5f1e9',
           display: 'standalone',
