@@ -150,8 +150,8 @@ function showLocalNotification(message: MessageResponse): void {
     navigator.serviceWorker.ready.then(registration => {
       registration.showNotification(chatName, {
         body,
-        icon: '/appicon/icon-192.png',
-        badge: '/appicon/icon-192.png',
+        icon: '/icon/pwa-192x192.png',
+        badge: '/icon/pwa-64x64.png',
         tag,
         data: {
           type: 'new_message',

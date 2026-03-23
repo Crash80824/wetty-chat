@@ -40,30 +40,44 @@ export function createBaseConfig(options: BaseConfigOptions = {}) {
         srcDir: 'src',
         filename: 'serviceWorker.ts',
         registerType: 'prompt',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+        // includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
           name: '茶话',
           short_name: '茶话',
           description: '一边喝茶一边聊天吧',
           theme_color: '#f7f7f7',
-          background_color: '#fbf9e9',
+          background_color: '#f5f1e9',
           display: 'standalone',
-          icons: [
+          "icons": [
             {
-              src: 'pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
+              "src": "/icon/icon.svg",
+              "sizes": "any",
+              "type": "image/svg+xml",
+              "purpose": "any"
             },
             {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
+              "src": "/icon-maskable/icon.svg",
+              "sizes": "any",
+              "type": "image/svg+xml",
+              "purpose": "maskable"
             },
             {
-              src: 'maskable-icon-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
+              "src": "/icon/pwa-192x192.png",
+              "sizes": "192x192",
+              "type": "image/png",
+              "purpose": "any"
+            },
+            {
+              "src": "/icon/pwa-512x512.png",
+              "sizes": "512x512",
+              "type": "image/png",
+              "purpose": "any"
+            },
+            {
+              "src": "/icon-maskable/pwa-512x512.png",
+              "sizes": "512x512",
+              "type": "image/png",
+              "purpose": "maskable"
             }
           ]
         },

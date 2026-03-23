@@ -9,29 +9,16 @@ export default defineConfig({
     preset: {
         transparent: {
             sizes: [64, 192, 512],
-            favicons: [[48, 'favicon.ico']],
             padding: 0,
-            resizeOptions: {
-                fit: 'contain',
-                background: 'transparent'
-            }
         },
         maskable: {
             sizes: [512],
-            padding: 0.15,
-            resizeOptions: {
-                fit: 'contain',
-                background: '#e9d8b9'
-            }
+            padding: 0,
         },
         apple: {
             sizes: [180],
             padding: 0,
-            resizeOptions: {
-                fit: 'contain',
-                background: '#e9d8b9'
-            }
         }
     },
-    images: ['public/appicon.svg']
+    images: ['public/icon/icon.svg', 'public/icon-maskable/icon.svg']
 })

@@ -7,7 +7,7 @@
     "dev": "vite -c vite.config.dev.ts",
     "build": "tsc -b && vite build -c vite.config.staging.ts",
     "build-prod": "tsc -b && vite build --base=/ --outDir prod-dist -c vite.config.prod.ts",
-    "generate-pwa-assets": "pwa-assets-generator",
+    "generate-pwa-assets": "pwa-assets-generator && rm -f public/icon/*-icon-*.png public/icon-maskable/pwa-*.png",
     "lint": "eslint .",
     "verify": "npm run lint && npm run typecheck",
     "extract": "lingui extract",

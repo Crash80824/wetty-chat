@@ -98,8 +98,8 @@ self.addEventListener('push', (event) => {
 
             const promiseChain = self.registration.showNotification(title, {
                 body: body,
-                icon: '/appicon/icon-192.png',
-                badge: '/appicon/icon-192.png', // Ideally should be a monochrome maskable icon
+                icon: '/icon/pwa-192x192.png',
+                badge: '/icon/pwa-64x64.png',
                 tag,
                 data: payload
             });
