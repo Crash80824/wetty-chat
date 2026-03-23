@@ -17,7 +17,6 @@ import {
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import {
-  settings,
   chevronDown,
   people,
   arrowUndo,
@@ -628,7 +627,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
               <IonIcon slot="icon-only" icon={people} />
             </IonButton>
             <IonButton onClick={() => history.push(`/chats/chat/${chatId}/settings`)}>
-              <IonIcon slot="icon-only" icon={settings} />
+              <IonIcon slot="icon-only" icon={informationCircleOutline} />
             </IonButton>
           </IonButtons>
           {!wsConnected && <IonProgressBar type="indeterminate" />}
