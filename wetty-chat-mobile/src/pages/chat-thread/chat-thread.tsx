@@ -56,7 +56,9 @@ import {
 import { messageAdded, messageConfirmed, messagePatched, reactionsUpdated } from '@/store/messageEvents';
 import type { RootState } from '@/store/index';
 import store from '@/store/index';
-import { VirtualScroll } from '@/components/chat/VirtualScroll';
+import { ChatVirtualScroll } from '@/components/chat/ChatVirtualScroll';
+import type { ChatRow, VirtualScrollAnchor, VirtualScrollHandle } from '@/components/chat/virtualScroll/types';
+import { useChatRows } from '@/components/chat/useChatRows';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import {
   type ComposeSendPayload,
@@ -145,7 +147,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         dispatch(setChatMeta({ chatId: chatId, meta }));
         dispatch(setChatMutedUntil({ chatId, mutedUntil: muted_until }));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [chatId, storedName, dispatch]);
   const messages = useSelector((state: RootState) => selectMessagesForChat(state, storeChatId));
   const messageLookup = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
@@ -171,18 +173,14 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     });
   }, []);
 
-  const scrollToBottomRef = useRef<(() => void) | null>(null);
-  const scrollToIndexRef = useRef<((index: number, behavior?: ScrollBehavior) => void) | null>(null);
+  const scrollApiRef = useRef<VirtualScrollHandle | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingNewer, setLoadingNewer] = useState(false);
   const loadingMoreRef = useRef(false);
   const loadingNewerRef = useRef(false);
-  const [prependedCount, setPrependedCount] = useState(0);
-  const pendingPrependRef = useRef<{ messages: MessageResponse[]; nextCursor: string | null; gen: number } | null>(
-    null,
-  );
-  const isScrollIdleRef = useRef(true);
-  const [windowKey, setWindowKey] = useState(0);
-  const [initialScrollIndex, setInitialScrollIndex] = useState<number | undefined>(undefined);
+  const [initialAnchor, setInitialAnchor] = useState<VirtualScrollAnchor>({ type: 'bottom', token: 0 });
+
+  const chatRows = useChatRows(messages, formatDateSeparator);
 
   const [atBottom, setAtBottom] = useState(true);
   const [replyingTo, setReplyingTo] = useState<MessageResponse | null>(null);
@@ -193,6 +191,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
   const [overlayMessage, setOverlayMessage] = useState<{ message: MessageResponse; sourceRect: DOMRect } | null>(null);
+
+  const getMessageKey = useCallback((message: MessageResponse) => `msg:${message.client_generated_id || message.id}`, []);
 
   const startEditingMessage = useCallback((message: MessageResponse) => {
     setReplyingTo(null);
@@ -264,13 +264,11 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
             prevCursor: null,
           }),
         );
-        setPrependedCount(0);
-        pendingPrependRef.current = null;
-        setWindowKey((k) => k + 1);
-        setInitialScrollIndex(undefined);
+        setInitialAnchor((currentAnchor) => ({ type: 'bottom', token: currentAnchor.token + 1 }));
       })
       .catch((err: Error) => {
         dispatch(resetChat({ chatId: storeChatId, messages: [], nextCursor: null, prevCursor: null }));
+        setInitialAnchor((currentAnchor) => ({ type: 'bottom', token: currentAnchor.token + 1 }));
         showToast(err.message || t`Failed to load messages`);
       });
   }, [chatId, storeChatId, threadId, dispatch, showToast]);
@@ -280,27 +278,10 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     fetchLatestWindow();
   }, [chatId, fetchLatestWindow]);
 
-  const flushPendingPrepend = useCallback(() => {
-    const pending = pendingPrependRef.current;
-    if (!pending) return;
-    pendingPrependRef.current = null;
-    if (selectChatGeneration(store.getState(), storeChatId) !== pending.gen) return;
-    dispatch(prependMessages({ chatId: storeChatId, messages: pending.messages, nextCursor: pending.nextCursor }));
-    setPrependedCount((c) => c + pending.messages.length);
-    loadingMoreRef.current = false;
-    setLoadingMore(false);
-  }, [storeChatId, dispatch]);
-
-  const handleScrollIdle = useCallback(() => {
-    isScrollIdleRef.current = true;
-    flushPendingPrepend();
-  }, [flushPendingPrepend]);
-
   const loadMore = useCallback(() => {
     const st = store.getState();
     const cursor = selectNextCursorForChat(st, storeChatId);
     if (!chatId || cursor == null || loadingMoreRef.current) return;
-    isScrollIdleRef.current = false;
     const gen = selectChatGeneration(st, storeChatId);
     loadingMoreRef.current = true;
     setLoadingMore(true);
@@ -308,17 +289,17 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       .then((res) => {
         if (selectChatGeneration(store.getState(), storeChatId) !== gen) return;
         const list = res.data.messages ?? [];
-        const pending = { messages: list, nextCursor: res.data.next_cursor ?? null, gen };
-        if (isScrollIdleRef.current) {
-          // Scroll already stopped — flush immediately
-          dispatch(prependMessages({ chatId: storeChatId, messages: list, nextCursor: pending.nextCursor }));
-          setPrependedCount((c) => c + list.length);
-          loadingMoreRef.current = false;
-          setLoadingMore(false);
-        } else {
-          // Buffer until scroll idle
-          pendingPrependRef.current = pending;
+        if (import.meta.env.DEV) {
+          console.log('[ChatThread] loadMore resolved', {
+            fetchedCount: list.length,
+            oldestId: list[0]?.id ?? null,
+            newestId: list[list.length - 1]?.id ?? null,
+            nextCursor: res.data.next_cursor ?? null,
+          });
         }
+        dispatch(prependMessages({ chatId: storeChatId, messages: list, nextCursor: res.data.next_cursor ?? null }));
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
       })
       .catch((err: Error) => {
         showToast(err.message || t`Failed to load more`);
@@ -333,6 +314,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     if (!chatId || prevCursor == null || loadingNewerRef.current) return;
     const gen = selectChatGeneration(st, storeChatId);
     loadingNewerRef.current = true;
+    setLoadingNewer(true);
     getMessages(chatId, { after: prevCursor, max: 50, thread_id: threadId })
       .then((res) => {
         if (selectChatGeneration(store.getState(), storeChatId) !== gen) return;
@@ -344,6 +326,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       })
       .finally(() => {
         loadingNewerRef.current = false;
+        setLoadingNewer(false);
       });
   }, [chatId, storeChatId, threadId, dispatch, showToast]);
 
@@ -356,7 +339,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         optimistic = existing
           .map((r) => (r.emoji === emoji ? { ...r, count: r.count - 1, reacted_by_me: false } : r))
           .filter((r) => r.count > 0);
-        deleteReaction(chatId, msg.id, emoji).catch(() => {});
+        deleteReaction(chatId, msg.id, emoji).catch(() => { });
       } else {
         const found = existing.find((r) => r.emoji === emoji);
         if (found) {
@@ -364,7 +347,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         } else {
           optimistic = [...existing, { emoji, count: 1, reacted_by_me: true }];
         }
-        putReaction(chatId, msg.id, emoji).catch(() => {});
+        putReaction(chatId, msg.id, emoji).catch(() => { });
       }
       dispatch(reactionsUpdated({ chatId, messageId: msg.id, reactions: optimistic }));
     },
@@ -377,7 +360,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       const currentMessages = selectMessagesForChat(state, storeChatId);
       const idx = currentMessages.findIndex((m) => m.id === messageId);
       if (idx !== -1) {
-        scrollToIndexRef.current?.(idx, 'smooth');
+        scrollApiRef.current?.scrollToItem(getMessageKey(currentMessages[idx]), 'smooth');
         return;
       }
       // Message not in current window — fetch centered window
@@ -392,19 +375,16 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
               prevCursor: res.data.prev_cursor ?? null,
             }),
           );
-          const idx = list.findIndex((m) => m.id === messageId);
-          setInitialScrollIndex(idx !== -1 ? idx : undefined);
-          setWindowKey((k) => k + 1);
-          setPrependedCount(0);
-          pendingPrependRef.current = null;
+          setInitialAnchor((currentAnchor) => ({ type: 'item', key: `msg:${messageId}`, token: currentAnchor.token + 1 }));
         })
         .catch((err: Error) => {
           showToast(err.message || t`Failed to jump to message`);
         });
     },
-    [chatId, storeChatId, threadId, dispatch, showToast],
+    [chatId, dispatch, getMessageKey, showToast, storeChatId, threadId],
   );
 
+  const nextCursor = useSelector((state: RootState) => selectNextCursorForChat(state, storeChatId));
   const prevCursor = useSelector((state: RootState) => selectPrevCursorForChat(state, storeChatId));
 
   const uploadAttachment = useCallback(async ({ file, dimensions, onProgress, signal }: ComposeUploadInput) => {
@@ -484,16 +464,17 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         reply_root_id: threadId ?? null,
         reply_to_message: replyingTo
           ? {
-              id: replyingTo.id,
-              message: replyingTo.message,
-              sender: replyingTo.sender,
-              is_deleted: replyingTo.is_deleted,
-              attachments: replyingTo.attachments,
-            }
+            id: replyingTo.id,
+            message: replyingTo.message,
+            sender: replyingTo.sender,
+            is_deleted: replyingTo.is_deleted,
+            attachments: replyingTo.attachments,
+          }
           : undefined,
         client_generated_id: clientGeneratedId,
         sender: {
           uid: currentUserId || 0,
+          gender: 0,
           name: currentUserName,
           avatar_url: currentUserAvatarUrl || undefined,
         },
@@ -515,7 +496,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         }),
       );
       setReplyingTo(null);
-      setTimeout(() => scrollToBottomRef.current?.(), 50);
+      setTimeout(() => scrollApiRef.current?.scrollToBottom(), 50);
 
       const messagePayload = {
         message: text,
@@ -536,10 +517,10 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
             ...postResponse,
             reply_to_message: postResponse.reply_to_message
               ? {
-                  ...optimistic.reply_to_message,
-                  ...postResponse.reply_to_message,
-                  attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
-                }
+                ...optimistic.reply_to_message,
+                ...postResponse.reply_to_message,
+                attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
+              }
               : optimistic.reply_to_message,
           };
           dispatch(
@@ -582,10 +563,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     ],
   );
 
-  const onClickChatItem = (messageIndex: number, sourceRect: DOMRect) => {
-    const msg = messages[messageIndex];
+  const onClickChatItem = useCallback((msg: MessageResponse, sourceRect: DOMRect) => {
     setOverlayMessage({ message: msg, sourceRect });
-  };
+  }, []);
 
   const overlayActions = useMemo((): MessageOverlayAction[] => {
     if (!overlayMessage) return [];
@@ -668,6 +648,60 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     return actions;
   }, [overlayMessage, currentUserId, threadId, chatId, history, dispatch, showToast, presentAlert, startEditingMessage]);
 
+  const renderRow = useCallback(
+    (row: ChatRow) => {
+      if (row.type === 'date') {
+        return (
+          <div className="chat-date-separator">
+            <span>{row.dateLabel}</span>
+          </div>
+        );
+      }
+
+      const msg = row.message;
+      return (
+        <ChatBubble
+          senderName={msg.sender.name ?? `User ${msg.sender.uid}`}
+          senderGender={msg.sender.gender}
+          senderGroup={msg.sender.user_group}
+          message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
+          isSent={msg.sender.uid === currentUserId}
+          avatarUrl={msg.sender.avatar_url}
+          onReply={() => setReplyingTo(msg)}
+          onReplyTap={
+            msg.reply_to_message && !msg.reply_to_message?.is_deleted
+              ? () => jumpToMessage(msg.reply_to_message!.id)
+              : undefined
+          }
+          onLongPress={(rect) => onClickChatItem(msg, rect)}
+          showName={row.showName}
+          showAvatar={row.showAvatar}
+          timestamp={msg.created_at}
+          edited={msg.is_edited}
+          threadInfo={!threadId ? msg.thread_info : undefined}
+          onThreadClick={() => history.push(`/chats/chat/${chatId}/thread/${msg.id}`)}
+          onAvatarClick={() => setProfileSender(msg.sender)}
+          attachments={msg.attachments}
+          isConfirmed={!msg.id.startsWith('cg_')}
+          reactions={msg.reactions}
+          onReactionToggle={(emoji, currentlyReacted) => handleReactionToggle(msg, emoji, currentlyReacted)}
+          replyTo={
+            msg.reply_to_message
+              ? {
+                senderName: msg.reply_to_message.sender.name ?? `User ${msg.reply_to_message.sender.uid}`,
+                message: msg.reply_to_message.message,
+                attachments:
+                  messageLookup.get(msg.reply_to_message.id)?.attachments ?? msg.reply_to_message.attachments,
+                isDeleted: msg.reply_to_message.is_deleted,
+              }
+              : undefined
+          }
+        />
+      );
+    },
+    [currentUserId, threadId, chatId, history, jumpToMessage, onClickChatItem, handleReactionToggle, messageLookup],
+  );
+
   return (
     <div className="ion-page chat-thread-page">
       <IonHeader>
@@ -694,105 +728,16 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       </IonHeader>
 
       <IonContent className="chat-thread-content" scrollX={false} scrollY={false}>
-        <VirtualScroll
-          totalItems={messages.length}
-          estimatedItemHeight={60}
-          overscan={10}
-          loadingOlder={loadingMore}
-          onLoadOlder={loadMore}
-          onLoadNewer={prevCursor != null ? loadNewer : undefined}
-          loadMoreThreshold={200}
-          prependedCount={prependedCount}
-          scrollToBottomRef={scrollToBottomRef}
-          scrollToIndexRef={scrollToIndexRef}
+        <ChatVirtualScroll
+          key={storeChatId}
+          rows={chatRows}
+          renderRow={renderRow}
+          initialAnchor={initialAnchor}
+          loadOlder={{ hasMore: nextCursor != null, loading: loadingMore, onLoad: loadMore }}
+          loadNewer={prevCursor != null ? { hasMore: true, loading: loadingNewer, onLoad: loadNewer } : undefined}
+          scrollApiRef={scrollApiRef}
           bottomPadding={16}
-          windowKey={windowKey}
-          initialScrollIndex={initialScrollIndex}
           onAtBottomChange={setAtBottom}
-          onScrollIdle={handleScrollIdle}
-          renderItem={(index: number) => {
-            const msg = messages[index];
-            const prevMsg = index > 0 ? messages[index - 1] : null;
-            const nextMsg = index < messages.length - 1 ? messages[index + 1] : null;
-
-            const prevSender = prevMsg ? prevMsg.sender.uid : null;
-            const nextSender = nextMsg ? nextMsg.sender.uid : null;
-
-            let showDateSeparator = false;
-            if (index === 0) {
-              showDateSeparator = true;
-            } else if (prevMsg) {
-              const d1 = new Date(msg.created_at);
-              const d2 = new Date(prevMsg.created_at);
-              if (
-                d1.getFullYear() !== d2.getFullYear() ||
-                d1.getMonth() !== d2.getMonth() ||
-                d1.getDate() !== d2.getDate()
-              ) {
-                showDateSeparator = true;
-              }
-            }
-
-            let isLastInGroup = nextSender !== msg.sender.uid;
-            if (!isLastInGroup && nextMsg) {
-              const d1 = new Date(msg.created_at);
-              const d2 = new Date(nextMsg.created_at);
-              if (
-                d1.getFullYear() !== d2.getFullYear() ||
-                d1.getMonth() !== d2.getMonth() ||
-                d1.getDate() !== d2.getDate()
-              ) {
-                isLastInGroup = true;
-              }
-            }
-
-            return (
-              <>
-                {showDateSeparator && (
-                  <div className="chat-date-separator">
-                    <span>{formatDateSeparator(msg.created_at)}</span>
-                  </div>
-                )}
-                <ChatBubble
-                  senderName={msg.sender.name ?? `User ${msg.sender.uid}`}
-                  senderGender={msg.sender.gender}
-                  senderGroup={msg.sender.user_group}
-                  message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
-                  isSent={msg.sender.uid === currentUserId}
-                  avatarUrl={msg.sender.avatar_url}
-                  onReply={() => setReplyingTo(msg)}
-                  onReplyTap={
-                    msg.reply_to_message && !msg.reply_to_message?.is_deleted
-                      ? () => jumpToMessage(msg.reply_to_message!.id)
-                      : undefined
-                  }
-                  onLongPress={(rect) => onClickChatItem(index, rect)}
-                  showName={prevSender !== msg.sender.uid || showDateSeparator}
-                  showAvatar={isLastInGroup}
-                  timestamp={msg.created_at}
-                  edited={msg.is_edited}
-                  threadInfo={!threadId ? msg.thread_info : undefined}
-                  onThreadClick={() => history.push(`/chats/chat/${chatId}/thread/${msg.id}`)}
-                  onAvatarClick={() => setProfileSender(msg.sender)}
-                  attachments={msg.attachments}
-                  isConfirmed={!msg.id.startsWith('cg_')}
-                  reactions={msg.reactions}
-                  onReactionToggle={(emoji, currentlyReacted) => handleReactionToggle(msg, emoji, currentlyReacted)}
-                  replyTo={
-                    msg.reply_to_message
-                      ? {
-                          senderName: msg.reply_to_message.sender.name ?? `User ${msg.reply_to_message.sender.uid}`,
-                          message: msg.reply_to_message.message,
-                          attachments:
-                            messageLookup.get(msg.reply_to_message.id)?.attachments ?? msg.reply_to_message.attachments,
-                          isDeleted: msg.reply_to_message.is_deleted,
-                        }
-                      : undefined
-                  }
-                />
-              </>
-            );
-          }}
         />
         <IonFab
           vertical="bottom"
@@ -805,7 +750,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
               if (prevCursor != null) {
                 fetchLatestWindow();
               } else {
-                scrollToBottomRef.current?.();
+                scrollApiRef.current?.scrollToBottom();
               }
             }}
           >
@@ -821,12 +766,12 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           replyTo={
             replyingTo
               ? {
-                  messageId: replyingTo.id,
-                  username: replyingTo.sender.name ?? `User ${replyingTo.sender.uid}`,
-                  text: replyingTo.message,
-                  attachments: replyingTo.attachments,
-                  isDeleted: replyingTo.is_deleted,
-                }
+                messageId: replyingTo.id,
+                username: replyingTo.sender.name ?? `User ${replyingTo.sender.uid}`,
+                text: replyingTo.message,
+                attachments: replyingTo.attachments,
+                isDeleted: replyingTo.is_deleted,
+              }
               : undefined
           }
           onCancelReply={() => setReplyingTo(null)}
@@ -855,13 +800,13 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           replyTo={
             overlayMessage.message.reply_to_message
               ? {
-                  senderName:
-                    overlayMessage.message.reply_to_message.sender.name ??
-                    `User ${overlayMessage.message.reply_to_message.sender.uid}`,
-                  message: overlayMessage.message.reply_to_message.message,
-                  attachments: overlayMessage.message.reply_to_message.attachments,
-                  isDeleted: overlayMessage.message.reply_to_message.is_deleted,
-                }
+                senderName:
+                  overlayMessage.message.reply_to_message.sender.name ??
+                  `User ${overlayMessage.message.reply_to_message.sender.uid}`,
+                message: overlayMessage.message.reply_to_message.message,
+                attachments: overlayMessage.message.reply_to_message.attachments,
+                isDeleted: overlayMessage.message.reply_to_message.is_deleted,
+              }
               : undefined
           }
           sourceRect={overlayMessage.sourceRect}
