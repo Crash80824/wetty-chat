@@ -303,13 +303,10 @@
 .reactionPill {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 6px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(0, 0, 0, 0.04);
-  font-size: 14px;
-  line-height: 1.4;
+  background: var(--ion-color-light-shade);
+  font-size: 21px;
+  line-height: 1;
   cursor: pointer;
   transition: background-color 0.15s ease;
 
@@ -319,22 +316,22 @@
 }
 
 .reactionPillActive {
-  border-color: var(--ion-color-primary);
-  background: rgba(var(--ion-color-primary-rgb), 0.12);
+  background: var(--ion-color-primary-tint);
 }
 
 .sent .reactionPill {
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--ion-color-primary-tint);
 }
 
 .sent .reactionPillActive {
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--ion-color-primary-shade);
+
 }
 
 .reactionEmoji {
-  font-size: 16px;
+  margin-left: 6px;
+  font-size: 19px;
+  line-height: 1;
 }
 
 .reactionCount {
@@ -345,15 +342,16 @@
 .reactorAvatars {
   display: inline-flex;
   align-items: center;
-  margin-left: 2px;
+  margin: 1.5px;
+  //margin-left: 2px;
 }
 
 .reactorAvatar {
-  width: 16px;
-  height: 16px;
+  width: 1em;
+  height: 1em;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  //border: 1px solid rgba(255, 255, 255, 0.8);
   position: relative;
 }
 
