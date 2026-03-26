@@ -198,16 +198,16 @@ export function MessageComposeBar({
         prev.map((draftRecord) =>
           draftRecord.draft.localId === localId
             ? {
-                ...draftRecord,
-                abortController,
-                draft: {
-                  ...draftRecord.draft,
-                  status: 'uploading',
-                  progress: 0,
-                  errorMessage: undefined,
-                  attachmentId: undefined,
-                },
-              }
+              ...draftRecord,
+              abortController,
+              draft: {
+                ...draftRecord.draft,
+                status: 'uploading',
+                progress: 0,
+                errorMessage: undefined,
+                attachmentId: undefined,
+              },
+            }
             : draftRecord,
         ),
       );
@@ -218,13 +218,13 @@ export function MessageComposeBar({
           prev.map((draftRecord) =>
             draftRecord.draft.localId === localId
               ? {
-                  ...draftRecord,
-                  draft: {
-                    ...draftRecord.draft,
-                    width: dimensions.width,
-                    height: dimensions.height,
-                  },
-                }
+                ...draftRecord,
+                draft: {
+                  ...draftRecord.draft,
+                  width: dimensions.width,
+                  height: dimensions.height,
+                },
+              }
               : draftRecord,
           ),
         );
@@ -237,12 +237,12 @@ export function MessageComposeBar({
               prev.map((draftRecord) =>
                 draftRecord.draft.localId === localId
                   ? {
-                      ...draftRecord,
-                      draft: {
-                        ...draftRecord.draft,
-                        progress,
-                      },
-                    }
+                    ...draftRecord,
+                    draft: {
+                      ...draftRecord.draft,
+                      progress,
+                    },
+                  }
                   : draftRecord,
               ),
             );
@@ -253,16 +253,16 @@ export function MessageComposeBar({
           prev.map((draftRecord) =>
             draftRecord.draft.localId === localId
               ? {
-                  ...draftRecord,
-                  abortController: undefined,
-                  draft: {
-                    ...draftRecord.draft,
-                    status: 'uploaded',
-                    progress: 100,
-                    attachmentId: result.attachmentId,
-                    errorMessage: undefined,
-                  },
-                }
+                ...draftRecord,
+                abortController: undefined,
+                draft: {
+                  ...draftRecord.draft,
+                  status: 'uploaded',
+                  progress: 100,
+                  attachmentId: result.attachmentId,
+                  errorMessage: undefined,
+                },
+              }
               : draftRecord,
           ),
         );
@@ -276,16 +276,16 @@ export function MessageComposeBar({
           prev.map((draftRecord) =>
             draftRecord.draft.localId === localId
               ? {
-                  ...draftRecord,
-                  abortController: undefined,
-                  draft: {
-                    ...draftRecord.draft,
-                    status: 'error',
-                    progress: 0,
-                    attachmentId: undefined,
-                    errorMessage: t`Upload failed`,
-                  },
-                }
+                ...draftRecord,
+                abortController: undefined,
+                draft: {
+                  ...draftRecord.draft,
+                  status: 'error',
+                  progress: 0,
+                  attachmentId: undefined,
+                  errorMessage: t`Upload failed`,
+                },
+              }
               : draftRecord,
           ),
         );
@@ -561,19 +561,19 @@ export function MessageComposeBar({
               <IonIcon icon={happyOutline} />
             </button>
           </FeatureGate>
-          <IonButton
-            fill="solid"
-            color="primary"
-            size="small"
-            className={`${styles.sendBtn}${!canSend ? ` ${styles.disabled}` : ''}`}
-            onClick={handleSend}
-            aria-label={t`Send message`}
-            disabled={!canSend}
-          >
-            <IonIcon slot="icon-only" icon={send} />
-          </IonButton>
         </div>
       </div>
+      <IonButton
+        fill="solid"
+        color="primary"
+        size="small"
+        className={`${styles.sendBtn}${!canSend ? ` ${styles.disabled}` : ''}`}
+        onClick={handleSend}
+        aria-label={t`Send message`}
+        disabled={!canSend}
+      >
+        <IonIcon slot="icon-only" icon={send} />
+      </IonButton>
     </div>
   );
 }
