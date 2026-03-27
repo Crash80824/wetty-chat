@@ -339,6 +339,7 @@ export function ChatBubble({
                           autoPlay
                           loop
                           muted
+                          playsInline
                           src={att.url}
                           className={styles.attachmentImage}
                           style={imageLayoutStyle ? undefined : { maxHeight: maxImageHeight }}
