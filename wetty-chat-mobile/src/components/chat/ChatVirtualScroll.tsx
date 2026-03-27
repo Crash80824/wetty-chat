@@ -59,6 +59,7 @@ function classifyKeyMutation(prev: string[], next: string[]): MutationType {
 
 const debugVirtualScroll = import.meta.env.DEV;
 const EDGE_HINT_HEIGHT = 36;
+const JUMP_TARGET_HIGHLIGHT_MS = 1000;
 
 function logVirtualScroll(event: string, details?: Record<string, unknown>) {
   if (!debugVirtualScroll) return;
@@ -221,6 +222,7 @@ export function ChatVirtualScroll({
   const scrollRafRef = useRef<number | null>(null);
   const bottomSettleRafRef = useRef<number | null>(null);
   const bottomSettleFramesRemainingRef = useRef(0);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastProgrammaticScrollRef = useRef<{
     source: string;
     at: number;
@@ -253,6 +255,7 @@ export function ChatVirtualScroll({
   const phaseRef = useRef<Phase>('WAITING_VIEWPORT');
   const [containerHeight, setContainerHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [highlightedRowKey, setHighlightedRowKey] = useState<string | null>(null);
   const [renderTick, setRenderTick] = useState(0);
   const triggerRender = useCallback(() => setRenderTick((value) => value + 1), []);
 
@@ -484,6 +487,18 @@ export function ChatVirtualScroll({
     });
     container.scrollTo({ top: target, behavior });
     return true;
+  }, []);
+
+  const triggerJumpTargetHighlight = useCallback((key: string) => {
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+    }
+
+    setHighlightedRowKey(key);
+    highlightTimerRef.current = setTimeout(() => {
+      setHighlightedRowKey((current) => (current === key ? null : current));
+      highlightTimerRef.current = null;
+    }, JUMP_TARGET_HIGHLIGHT_MS);
   }, []);
 
   const resolveMessageTarget = useCallback(
@@ -1225,6 +1240,9 @@ export function ChatVirtualScroll({
         if (scrolled && pendingScrollMessageIdRef.current === intent.scrollToMessageId.messageId) {
           pendingScrollMessageIdRef.current = null;
         }
+        if (scrolled) {
+          triggerJumpTargetHighlight(target.key);
+        }
       } else {
         logVirtualScroll('layout-intent-scroll-to-message-missed', {
           messageId: intent.scrollToMessageId.messageId,
@@ -1243,6 +1261,9 @@ export function ChatVirtualScroll({
       if (scrolled && pendingScrollKeyRef.current === intent.scrollToKey.key) {
         pendingScrollKeyRef.current = null;
       }
+      if (scrolled) {
+        triggerJumpTargetHighlight(intent.scrollToKey.key);
+      }
     }
 
     if (pendingScrollKeyRef.current && !intent?.scrollToKey) {
@@ -1255,6 +1276,7 @@ export function ChatVirtualScroll({
         });
         const scrolled = scrollToKeyInternal(pendingScrollKeyRef.current, pendingScrollBehaviorRef.current);
         if (scrolled) {
+          triggerJumpTargetHighlight(pendingScrollKeyRef.current);
           pendingScrollKeyRef.current = null;
         }
       }
@@ -1376,6 +1398,7 @@ export function ChatVirtualScroll({
     scrollToKeyInternal,
     setPhaseState,
     triggerRender,
+    triggerJumpTargetHighlight,
     updateAtBottom,
   ]);
 
@@ -1882,6 +1905,7 @@ export function ChatVirtualScroll({
         if (mounted && targetIndex >= mounted.start && targetIndex <= mounted.end) {
           const scrolled = scrollToKeyInternal(key, resolvedBehavior);
           if (scrolled) {
+            triggerJumpTargetHighlight(key);
             pendingScrollKeyRef.current = null;
           }
           return;
@@ -1938,6 +1962,7 @@ export function ChatVirtualScroll({
         if (mounted && target.index >= mounted.start && target.index <= mounted.end) {
           const scrolled = scrollToKeyInternal(target.key, resolvedBehavior);
           if (scrolled) {
+            triggerJumpTargetHighlight(target.key);
             pendingScrollMessageIdRef.current = null;
           }
           return;
@@ -1962,13 +1987,22 @@ export function ChatVirtualScroll({
         scrollApiRef.current = null;
       }
     };
-  }, [ensureBottomMeasured, enterRecentering, keyToIndex, resolveMessageTarget, scrollApiRef, scrollToKeyInternal]);
+  }, [
+    ensureBottomMeasured,
+    enterRecentering,
+    keyToIndex,
+    resolveMessageTarget,
+    scrollApiRef,
+    scrollToKeyInternal,
+    triggerJumpTargetHighlight,
+  ]);
 
   useEffect(() => {
     return () => {
       if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
       if (scrollRafRef.current != null) cancelAnimationFrame(scrollRafRef.current);
       if (bottomSettleRafRef.current != null) cancelAnimationFrame(bottomSettleRafRef.current);
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     };
   }, []);
 
@@ -2058,7 +2092,13 @@ export function ChatVirtualScroll({
 
       mountedRows.push(
         <MeasuredRow key={row.key} rowKey={row.key} onMeasure={handleMountedMeasure} registerRow={registerRow}>
-          {renderRow(row)}
+          <div
+            className={
+              row.key === highlightedRowKey ? `${styles.rowContent} ${styles.rowContentHighlighted}` : styles.rowContent
+            }
+          >
+            {renderRow(row)}
+          </div>
         </MeasuredRow>,
       );
     }

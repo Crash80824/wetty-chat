@@ -20,6 +20,17 @@
   width: 100%;
 }
 
+.rowContent {
+  width: 100%;
+  background: transparent;
+  transition: background-color 100ms ease-out;
+}
+
+.rowContentHighlighted {
+  background: rgba(var(--ion-color-warning-rgb, 255, 196, 9), 0.18);
+  transition: background-color 100ms ease-out;
+}
+
 .spacer {
   width: 100%;
 }
