@@ -13,6 +13,15 @@ pub enum GroupVisibility {
 }
 
 #[derive(diesel_derive_enum::DbEnum, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[ExistingTypePath = "crate::schema::sql_types::MediaPurpose"]
+#[serde(rename_all = "snake_case")]
+pub enum MediaPurpose {
+    Avatar,
+    Sticker,
+    Generic,
+}
+
+#[derive(diesel_derive_enum::DbEnum, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[ExistingTypePath = "crate::schema::sql_types::GroupRole"]
 #[serde(rename_all = "snake_case")]
 pub enum GroupRole {
@@ -72,10 +81,9 @@ pub struct NewGroup {
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
-#[diesel(table_name = schema::media_images)]
-pub struct MediaImage {
+#[diesel(table_name = schema::media)]
+pub struct Media {
     pub id: i64,
-    pub owner_group_id: i64,
     pub content_type: String,
     pub storage_key: String,
     pub size: i64,
@@ -84,13 +92,14 @@ pub struct MediaImage {
     pub file_name: String,
     pub width: Option<i32>,
     pub height: Option<i32>,
+    pub purpose: MediaPurpose,
+    pub reference: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
-#[diesel(table_name = schema::media_images)]
-pub struct NewMediaImage {
+#[diesel(table_name = schema::media)]
+pub struct NewMedia {
     pub id: i64,
-    pub owner_group_id: i64,
     pub content_type: String,
     pub storage_key: String,
     pub size: i64,
@@ -99,6 +108,8 @@ pub struct NewMediaImage {
     pub file_name: String,
     pub width: Option<i32>,
     pub height: Option<i32>,
+    pub purpose: MediaPurpose,
+    pub reference: Option<String>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]

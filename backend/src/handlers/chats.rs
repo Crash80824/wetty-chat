@@ -32,7 +32,7 @@ use crate::{
         attachments,
         group_membership,
         groups,
-        media_images,
+        media,
         message_reactions,
         messages, //
     },
@@ -112,9 +112,9 @@ async fn get_chats(
         .inner_join(group_membership::table)
         .left_join(messages::table.on(groups::last_message_id.eq(messages::id.nullable())))
         .left_join(
-            media_images::table.on(groups::avatar_image_id
-                .eq(media_images::id.nullable())
-                .and(media_images::deleted_at.is_null())),
+            media::table.on(groups::avatar_image_id
+                .eq(media::id.nullable())
+                .and(media::deleted_at.is_null())),
         )
         .filter(group_membership::uid.eq(uid));
 
@@ -134,7 +134,7 @@ async fn get_chats(
             .select((
                 groups::id,
                 groups::name,
-                media_images::storage_key.nullable(),
+                media::storage_key.nullable(),
                 groups::last_message_at,
                 unread_count_sq.clone(),
                 group_membership::last_read_message_id,
@@ -180,7 +180,7 @@ async fn get_chats(
                     .select((
                         groups::id,
                         groups::name,
-                        media_images::storage_key.nullable(),
+                        media::storage_key.nullable(),
                         groups::last_message_at,
                         unread_count_sq.clone(),
                         group_membership::last_read_message_id,
@@ -209,7 +209,7 @@ async fn get_chats(
                     .select((
                         groups::id,
                         groups::name,
-                        media_images::storage_key.nullable(),
+                        media::storage_key.nullable(),
                         groups::last_message_at,
                         unread_count_sq.clone(),
                         group_membership::last_read_message_id,

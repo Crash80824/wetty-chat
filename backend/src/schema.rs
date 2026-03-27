@@ -5,7 +5,7 @@ pub mod primary;
 use discuz::discuz::{common_member, common_usergroup};
 use discuz_manual::discuz::common_member_profile;
 pub use primary::{
-    activity_daily_metrics, attachments, clients, group_membership, groups, media_images,
+    activity_daily_metrics, attachments, clients, group_membership, groups, media,
     message_reactions, messages, push_subscriptions, sql_types, user_extra, usergroup_extra,
 };
 

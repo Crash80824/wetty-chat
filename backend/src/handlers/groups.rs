@@ -10,10 +10,10 @@ use std::collections::BTreeMap;
 
 use crate::handlers::members::check_membership;
 use crate::models::{
-    GroupRole, GroupVisibility, MediaImage, NewGroup, NewGroupMembership, NewMediaImage,
+    GroupRole, GroupVisibility, Media, MediaPurpose, NewGroup, NewGroupMembership, NewMedia,
     UpdateGroup,
 };
-use crate::schema::{group_membership, groups, media_images};
+use crate::schema::{group_membership, groups, media};
 use crate::services::media::{build_public_object_url, build_storage_key, presign_public_upload};
 use crate::utils::auth::CurrentUid;
 use crate::utils::ids;
@@ -138,13 +138,13 @@ fn load_chat_detail(
         .map_err(|_| (StatusCode::NOT_FOUND, "Chat not found"))?;
 
     let avatar_image = match group.avatar_image_id {
-        Some(avatar_image_id) => media_images::table
+        Some(avatar_image_id) => media::table
             .filter(
-                media_images::id
+                media::id
                     .eq(avatar_image_id)
-                    .and(media_images::deleted_at.is_null()),
+                    .and(media::deleted_at.is_null()),
             )
-            .select(MediaImage::as_select())
+            .select(Media::as_select())
             .first(conn)
             .optional()
             .map_err(|e| {
@@ -292,10 +292,9 @@ async fn post_avatar_upload_url(
     )
     .await?;
 
-    diesel::insert_into(media_images::table)
-        .values(&NewMediaImage {
+    diesel::insert_into(media::table)
+        .values(&NewMedia {
             id,
-            owner_group_id: chat_id,
             content_type: payload.content_type,
             storage_key,
             size: payload.size,
@@ -304,6 +303,8 @@ async fn post_avatar_upload_url(
             file_name: payload.filename,
             width: payload.width,
             height: payload.height,
+            purpose: MediaPurpose::Avatar,
+            reference: Some(chat_id.to_string()),
         })
         .execute(conn)
         .map_err(|e| {
@@ -347,12 +348,12 @@ async fn patch_group(
         .map_err(|_| (StatusCode::NOT_FOUND, "Chat not found"))?;
 
     if let Some(Some(image_id)) = body.avatar_image_id {
-        let owned_image_exists = media_images::table
+        let owned_image_exists = media::table
             .filter(
-                media_images::id
+                media::id
                     .eq(image_id)
-                    .and(media_images::owner_group_id.eq(chat_id))
-                    .and(media_images::deleted_at.is_null()),
+                    .and(media::purpose.eq(MediaPurpose::Avatar))
+                    .and(media::deleted_at.is_null()),
             )
             .count()
             .get_result::<i64>(conn)
@@ -384,11 +385,9 @@ async fn patch_group(
 
             if let Some(previous_avatar_image_id) = current_group.avatar_image_id {
                 if Some(previous_avatar_image_id) != next_avatar_image_id {
-                    diesel::update(
-                        media_images::table.filter(media_images::id.eq(previous_avatar_image_id)),
-                    )
-                    .set(media_images::deleted_at.eq(Some(Utc::now())))
-                    .execute(conn)?;
+                    diesel::update(media::table.filter(media::id.eq(previous_avatar_image_id)))
+                        .set(media::deleted_at.eq(Some(Utc::now())))
+                        .execute(conn)?;
                 }
             }
         }

@@ -9,6 +9,10 @@ pub mod sql_types {
     #[diesel(postgres_type(name = "group_visibility"))]
     pub struct GroupVisibility;
 
+    #[derive(diesel::sql_types::SqlType, diesel::query_builder::QueryId)]
+    #[diesel(postgres_type(name = "media_purpose"))]
+    pub struct MediaPurpose;
+
     #[derive(diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "message_type"))]
     pub struct MessageType;
@@ -87,9 +91,11 @@ diesel::table! {
 }
 
 diesel::table! {
-    media_images (id) {
+    use diesel::sql_types::*;
+    use super::sql_types::MediaPurpose;
+
+    media (id) {
         id -> Int8,
-        owner_group_id -> Int8,
         #[max_length = 255]
         content_type -> Varchar,
         storage_key -> Text,
@@ -100,6 +106,9 @@ diesel::table! {
         file_name -> Varchar,
         width -> Nullable<Int4>,
         height -> Nullable<Int4>,
+        purpose -> MediaPurpose,
+        #[max_length = 255]
+        reference -> Nullable<Varchar>,
     }
 }
 
@@ -168,7 +177,6 @@ diesel::table! {
 
 diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
-diesel::joinable!(media_images -> groups (owner_group_id));
 diesel::joinable!(message_reactions -> messages (message_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
@@ -177,7 +185,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     clients,
     group_membership,
     groups,
-    media_images,
+    media,
     message_reactions,
     messages,
     push_subscriptions,
