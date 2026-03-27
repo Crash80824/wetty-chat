@@ -1,14 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { IonIcon } from '@ionic/react';
-import { checkmarkCircle, checkmarkCircleOutline, documentOutline } from 'ionicons/icons';
-import { t } from '@lingui/core/macro';
-import { useSelector } from 'react-redux';
-import { renderMessageWithLinks } from './renderMessageWithLinks';
-import { getMessagePreviewText } from './messagePreview';
-import { selectChatFontSizeStyle } from '@/store/settingsSlice';
 import type { Attachment } from '@/api/messages';
-import { useMouseDetected } from '@/hooks/platformHooks';
+import { ChatBubbleBase } from './messages/ChatBubbleBase';
 import styles from './MessageOverlay.module.scss';
 
 export interface MessageOverlayAction {
@@ -45,11 +39,6 @@ interface MessageOverlayProps {
   onClose: () => void;
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-}
-
 export function MessageOverlay({
   senderName,
   message,
@@ -66,8 +55,6 @@ export function MessageOverlay({
   onClose,
 }: MessageOverlayProps) {
   const contentRef = useRef<HTMLDivElement>(null);
-  const chatFontSizeStyle = useSelector(selectChatFontSizeStyle);
-  const mouseDetected = useMouseDetected();
 
   // Compute position after first render so we know the full content dimensions
   useLayoutEffect(() => {
@@ -138,8 +125,6 @@ export function MessageOverlay({
     }
   }
 
-  const bubbleClass = `${styles.bubbleClone} ${mouseDetected ? styles.mouseSelectable : ''} ${isSent ? styles.bubbleSent : styles.bubbleReceived}`;
-
   const overlay = (
     <div className={styles.overlay} onClick={handleBackdropClick}>
       <div
@@ -167,56 +152,25 @@ export function MessageOverlay({
         )}
 
         {/* Bubble clone */}
-        <div data-bubble-clone className={bubbleClass} style={{ fontSize: chatFontSizeStyle, width: sourceRect.width }}>
-          {showName && <div className={styles.senderName}>{senderName}</div>}
-          {replyTo && (
-            <div className={styles.replyPreview}>
-              <div className={styles.replyPreviewName}>{replyTo.senderName}</div>
-              <div className={styles.replyPreviewText}>
-                {getMessagePreviewText({
-                  message: replyTo.message,
-                  attachments: replyTo.attachments,
-                  firstAttachmentKind: replyTo.firstAttachmentKind,
-                  isDeleted: replyTo.isDeleted,
-                })}
-              </div>
-            </div>
-          )}
-          {attachments && attachments.length > 0 && (
-            <div className={styles.attachmentsContainer}>
-              {attachments.map((att) => {
-                if (att.kind.startsWith('image/')) {
-                  return <img key={att.id} src={att.url} alt={t`Attachment`} className={styles.attachmentImage} />;
-                } else if (att.kind.startsWith('video/')) {
-                  return <video autoPlay loop muted key={att.id} src={att.url} className={styles.attachmentImage} />;
-                } else {
-                  return (
-                    <div key={att.id} className={styles.filePlaceholder}>
-                      <IonIcon icon={documentOutline} className={styles.fileIcon} />
-                      <span className={styles.fileName}>{att.file_name}</span>
-                    </div>
-                  );
-                }
-              })}
-            </div>
-          )}
-          <div className={styles.messageWrapper}>
-            <span className={styles.messageText}>{renderMessageWithLinks(message)}</span>
-            <span className={styles.timestampSpacer} />
-            {timestamp && (
-              <span className={styles.timestamp}>
-                {formatTime(timestamp)}
-                {edited && ` (${t`Edited`})`}
-                {isSent && (
-                  <IonIcon
-                    icon={isConfirmed ? checkmarkCircle : checkmarkCircleOutline}
-                    className={styles.statusIcon}
-                  />
-                )}
-              </span>
-            )}
-          </div>
-        </div>
+        <ChatBubbleBase
+          senderName={senderName}
+          message={message}
+          isSent={isSent}
+          showName={showName}
+          showAvatar={false}
+          replyTo={replyTo}
+          timestamp={timestamp}
+          edited={edited}
+          isConfirmed={isConfirmed}
+          attachments={attachments}
+          layout="bubble-only"
+          interactionMode="read-only"
+          bubbleProps={{
+            'data-bubble-clone': 'true',
+            className: styles.bubbleClone,
+            style: { width: sourceRect.width },
+          }}
+        />
 
         {/* Action list */}
         <div className={styles.actionList}>

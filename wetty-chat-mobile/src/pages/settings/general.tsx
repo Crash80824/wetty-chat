@@ -18,7 +18,7 @@ import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { i18n } from '@/i18n';
 import { BackButton } from '@/components/BackButton';
-import { ChatBubble } from '@/components/chat/ChatBubble';
+import { ChatBubble } from '@/components/chat/messages/ChatBubble';
 import { chatFontSizeOptions, selectLocale, selectMessageFontSize, setMessageFontSize } from '@/store/settingsSlice';
 import type { BackAction } from '@/types/back-action';
 import styles from './GeneralSettings.module.scss';

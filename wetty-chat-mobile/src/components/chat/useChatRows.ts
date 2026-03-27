@@ -19,6 +19,10 @@ function isSameDate(a: string, b: string): boolean {
   return formatDateKey(a) === formatDateKey(b);
 }
 
+function isSystemMessage(message: MessageResponse): boolean {
+  return message.message_type === 'system';
+}
+
 export function useChatRows(messages: MessageResponse[], formatDateSeparator: (iso: string) => string): ChatRow[] {
   return useMemo(() => {
     const rows: ChatRow[] = [];
@@ -43,11 +47,18 @@ export function useChatRows(messages: MessageResponse[], formatDateSeparator: (i
         prevSenderUid = null;
       }
 
+      const isSystem = isSystemMessage(msg);
+      const nextIsSystem = nextMsg ? isSystemMessage(nextMsg) : false;
+
       // Grouping
       const hasDateSeparator = isFirstMessage || isDateBoundary;
-      const showName = msg.sender.uid !== prevSenderUid || hasDateSeparator;
+      const showName = !isSystem && (msg.sender.uid !== prevSenderUid || hasDateSeparator);
       const isLastInGroup =
-        !nextMsg || nextMsg.sender.uid !== msg.sender.uid || !isSameDate(msg.created_at, nextMsg.created_at);
+        isSystem ||
+        !nextMsg ||
+        nextIsSystem ||
+        nextMsg.sender.uid !== msg.sender.uid ||
+        !isSameDate(msg.created_at, nextMsg.created_at);
 
       rows.push({
         type: 'message',
@@ -59,7 +70,7 @@ export function useChatRows(messages: MessageResponse[], formatDateSeparator: (i
         showAvatar: isLastInGroup,
       });
 
-      prevSenderUid = msg.sender.uid;
+      prevSenderUid = isSystem ? null : msg.sender.uid;
     }
 
     return rows;

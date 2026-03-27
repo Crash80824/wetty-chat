@@ -33,6 +33,15 @@
   }
 }
 
+.bubbleOnly {
+  display: flex;
+  padding: 4px 12px;
+
+  .bubble {
+    max-width: none;
+  }
+}
+
 .avatar {
   width: 36px;
   height: 36px;
@@ -99,6 +108,15 @@
   background: rgba(128, 128, 128, 0.2);
   cursor: pointer;
   appearance: none;
+}
+
+.attachmentStatic {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(128, 128, 128, 0.2);
 }
 
 .attachmentImage {

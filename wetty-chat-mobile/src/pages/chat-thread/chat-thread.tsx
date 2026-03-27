@@ -66,7 +66,6 @@ import store from '@/store/index';
 import { ChatVirtualScroll } from '@/components/chat/ChatVirtualScroll';
 import type { ChatRow, VirtualScrollAnchor, VirtualScrollHandle } from '@/components/chat/virtualScroll/types';
 import { useChatRows } from '@/components/chat/useChatRows';
-import { ChatBubble } from '@/components/chat/ChatBubble';
 import {
   type ComposeSendPayload,
   type MessageComposeBarHandle,
@@ -86,6 +85,7 @@ import type { BackAction } from '@/types/back-action';
 import { requestUploadUrl, uploadFileToS3 } from '@/api/upload';
 import { syncAppBadgeCount } from '@/utils/badges';
 import { useIsDesktop } from '@/hooks/platformHooks';
+import { ChatMessageRow } from '@/components/chat/messages/ChatMessageRow';
 
 const QUICK_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉'];
 
@@ -904,51 +904,17 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
   const renderRow = useCallback(
     (row: ChatRow) => {
-      if (row.type === 'date') {
-        return (
-          <div className="chat-date-separator">
-            <span>{row.dateLabel}</span>
-          </div>
-        );
-      }
-
-      const msg = row.message;
       return (
-        <ChatBubble
-          senderName={msg.sender.name ?? `User ${msg.sender.uid}`}
-          senderGender={msg.sender.gender}
-          senderGroup={msg.sender.user_group}
-          message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
-          isSent={msg.sender.uid === currentUserId}
-          avatarUrl={msg.sender.avatar_url}
-          onReply={() => setReplyingTo(msg)}
-          onReplyTap={
-            msg.reply_to_message && !msg.reply_to_message?.is_deleted
-              ? () => jumpToMessage(msg.reply_to_message!.id)
-              : undefined
-          }
-          onLongPress={(rect) => onClickChatItem(msg, rect)}
-          showName={row.showName}
-          showAvatar={row.showAvatar}
-          timestamp={msg.created_at}
-          edited={msg.is_edited}
-          threadInfo={!threadId ? msg.thread_info : undefined}
-          onThreadClick={() => history.push(`/chats/chat/${chatId}/thread/${msg.id}`)}
-          onAvatarClick={() => setProfileSender(msg.sender)}
-          attachments={msg.attachments}
-          isConfirmed={!msg.id.startsWith('cg_')}
-          reactions={msg.reactions}
-          onReactionToggle={(emoji, currentlyReacted) => handleReactionToggle(msg, emoji, currentlyReacted)}
-          replyTo={
-            msg.reply_to_message
-              ? {
-                  senderName: msg.reply_to_message.sender.name ?? `User ${msg.reply_to_message.sender.uid}`,
-                  message: msg.reply_to_message.message,
-                  firstAttachmentKind: msg.reply_to_message.first_attachment_kind ?? null,
-                  isDeleted: msg.reply_to_message.is_deleted,
-                }
-              : undefined
-          }
+        <ChatMessageRow
+          row={row}
+          currentUserId={currentUserId}
+          threadId={threadId}
+          onReply={setReplyingTo}
+          onJumpToReply={jumpToMessage}
+          onLongPress={onClickChatItem}
+          onAvatarClick={setProfileSender}
+          onThreadClick={(message) => history.push(`/chats/chat/${chatId}/thread/${message.id}`)}
+          onReactionToggle={handleReactionToggle}
         />
       );
     },
