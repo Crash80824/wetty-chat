@@ -9,6 +9,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
 
+use crate::handlers::groups::load_requester_group_role;
 use crate::models::{
     GroupJoinReason, GroupMembership, GroupRole, NewGroupMembership, UserGroupInfo,
 };
@@ -173,18 +174,10 @@ async fn get_members(
 
     use crate::schema::group_membership::dsl as gm_dsl;
 
-    let requester_is_admin = group_membership::table
-        .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)))
-        .select(gm_dsl::role)
-        .first::<GroupRole>(conn)
-        .map(|role| role == GroupRole::Admin)
-        .map_err(|e| {
-            tracing::error!("get requester role: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to load requester role",
-            )
-        })?;
+    let requester_is_admin = matches!(
+        load_requester_group_role(conn, chat_id, uid)?,
+        Some(GroupRole::Admin)
+    );
 
     let limit = q
         .limit

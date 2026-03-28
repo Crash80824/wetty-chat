@@ -59,6 +59,7 @@ pub(super) struct GroupInfoResponse {
     avatar: Option<String>,
     visibility: GroupVisibility,
     created_at: DateTime<Utc>,
+    my_role: Option<GroupRole>,
 }
 
 #[derive(Debug, Clone, Copy, serde::Deserialize, PartialEq, Eq)]
@@ -179,22 +180,30 @@ fn parse_group_search_query(
     Some(ParsedGroupSearch { pattern, exact_id })
 }
 
-fn require_admin_role(
+pub(super) fn load_requester_group_role(
     conn: &mut DbConn,
     chat_id: i64,
     uid: i32,
-) -> Result<(), (StatusCode, &'static str)> {
+) -> Result<Option<GroupRole>, (StatusCode, &'static str)> {
     use crate::schema::group_membership::dsl as gm_dsl;
 
-    let role: Option<GroupRole> = group_membership::table
+    group_membership::table
         .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)))
         .select(gm_dsl::role)
         .first(conn)
         .optional()
         .map_err(|e| {
-            tracing::error!("check admin role: {:?}", e);
+            tracing::error!("load requester group role: {:?}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?;
+        })
+}
+
+fn require_admin_role(
+    conn: &mut DbConn,
+    chat_id: i64,
+    uid: i32,
+) -> Result<(), (StatusCode, &'static str)> {
+    let role = load_requester_group_role(conn, chat_id, uid)?;
 
     match role {
         Some(r) if r == GroupRole::Admin => Ok(()),
@@ -207,6 +216,7 @@ pub(super) fn load_group_info(
     conn: &mut DbConn,
     state: &AppState,
     chat_id: i64,
+    requester_uid: i32,
 ) -> Result<GroupInfoResponse, (StatusCode, &'static str)> {
     use crate::schema::groups::dsl as groups_dsl;
 
@@ -236,6 +246,8 @@ pub(super) fn load_group_info(
         None => None,
     };
 
+    let my_role = load_requester_group_role(conn, chat_id, requester_uid)?;
+
     Ok(GroupInfoResponse {
         id: group.id,
         name: group.name,
@@ -247,6 +259,7 @@ pub(super) fn load_group_info(
             .map(|image| build_public_object_url(state, &image.storage_key)),
         visibility: group.visibility,
         created_at: group.created_at,
+        my_role,
     })
 }
 
@@ -397,21 +410,28 @@ async fn get_groups(
 
     let has_more = rows.len() as i64 > limit;
     let page_rows: Vec<Row> = rows.into_iter().take(limit as usize).collect();
-    let next_cursor = has_more.then(|| page_rows.last().map(|(id, _, _, _, _, _)| *id)).flatten();
+    let next_cursor = has_more
+        .then(|| page_rows.last().map(|(id, _, _, _, _, _)| *id))
+        .flatten();
 
     let groups = page_rows
         .into_iter()
-        .map(|(id, name, description, avatar_key, visibility, role)| GroupSelectorItem {
-            id,
-            name,
-            description,
-            avatar: avatar_key.map(|key| build_public_object_url(&state, &key)),
-            visibility,
-            role,
-        })
+        .map(
+            |(id, name, description, avatar_key, visibility, role)| GroupSelectorItem {
+                id,
+                name,
+                description,
+                avatar: avatar_key.map(|key| build_public_object_url(&state, &key)),
+                visibility,
+                role,
+            },
+        )
         .collect();
 
-    Ok(Json(ListGroupsResponse { groups, next_cursor }))
+    Ok(Json(ListGroupsResponse {
+        groups,
+        next_cursor,
+    }))
 }
 
 /// GET /group/:chat_id — Get chat details.
@@ -429,7 +449,7 @@ async fn get_group(
 
     check_membership(conn, chat_id, uid)?;
 
-    Ok(Json(load_group_info(conn, &state, chat_id)?))
+    Ok(Json(load_group_info(conn, &state, chat_id, uid)?))
 }
 
 /// POST /group/:chat_id/avatar/upload-url — Create a group avatar upload URL.
@@ -580,7 +600,7 @@ async fn patch_group(
         (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update chat")
     })?;
 
-    Ok(Json(load_group_info(conn, &state, chat_id)?))
+    Ok(Json(load_group_info(conn, &state, chat_id, uid)?))
 }
 
 /// PUT /group/:chat_id/mute — Mute notifications for a chat.

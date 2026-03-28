@@ -79,7 +79,10 @@ struct SendInviteMessageBody {
     source_chat_id: i64,
     #[serde(deserialize_with = "crate::serde_i64_string::deserialize")]
     destination_chat_id: i64,
-    #[serde(default, deserialize_with = "crate::serde_i64_string::opt::deserialize")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde_i64_string::opt::deserialize"
+    )]
     invite_id: Option<i64>,
     expires_at: Option<DateTime<Utc>>,
     client_generated_id: String,
@@ -497,7 +500,10 @@ async fn post_send_invite_message(
         let invite = load_invite_by_id(conn, invite_id)?;
         require_admin_role(conn, invite.chat_id, uid)?;
         if invite.chat_id != body.source_chat_id {
-            return Err((StatusCode::BAD_REQUEST, "Invite does not belong to source chat"));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Invite does not belong to source chat",
+            ));
         }
         if !validate_invite_is_active(&invite, now) {
             return Err((StatusCode::BAD_REQUEST, "Invite is no longer active"));
@@ -630,7 +636,7 @@ async fn get_invite_by_code(
         }
     })?;
 
-    let chat = load_group_info(conn, &state, invite.chat_id)?;
+    let chat = load_group_info(conn, &state, invite.chat_id, uid)?;
 
     Ok(Json(InvitePreviewResponse {
         invite: invite_to_response(invite),
@@ -824,7 +830,7 @@ async fn post_redeem_invite(
         }
     };
 
-    let chat = load_group_info(conn, &state, chat_id)?;
+    let chat = load_group_info(conn, &state, chat_id, uid)?;
     Ok(Json(RedeemInviteResponse { chat }))
 }
 

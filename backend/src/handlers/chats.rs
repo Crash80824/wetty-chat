@@ -1110,8 +1110,7 @@ async fn post_thread_message(
 #[cfg(test)]
 mod tests {
     use super::{
-        validate_client_message_type, INVITE_MESSAGE_TYPE_FORBIDDEN,
-        SYSTEM_MESSAGE_TYPE_FORBIDDEN,
+        validate_client_message_type, INVITE_MESSAGE_TYPE_FORBIDDEN, SYSTEM_MESSAGE_TYPE_FORBIDDEN,
     };
     use crate::models::MessageType;
     use axum::http::StatusCode;
