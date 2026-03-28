@@ -95,16 +95,35 @@ function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
 /** Deduplicates the settings / members modal pattern. */
 function ChatModal({
   chatId,
-  activeChatId,
+  routePath,
   children,
 }: {
   chatId: string | null;
-  activeChatId: string | undefined;
+  routePath: string;
   children: (chatId: string, backAction: BackAction) => ReactNode;
 }) {
   const history = useHistory();
+  const location = useLocation();
+
+  const handleDidDismiss = useCallback(() => {
+    if (!chatId) {
+      return;
+    }
+
+    const stillOnModalRoute = !!matchPath(location.pathname, {
+      path: routePath,
+      exact: true,
+    });
+
+    if (!stillOnModalRoute) {
+      return;
+    }
+
+    history.push(`/chats/chat/${chatId}`);
+  }, [chatId, history, location.pathname, routePath]);
+
   return (
-    <IonModal isOpen={chatId != null} onDidDismiss={() => history.push(`/chats/chat/${activeChatId}`)}>
+    <IonModal isOpen={chatId != null} onDidDismiss={handleDidDismiss}>
       {chatId != null &&
         children(chatId, {
           type: 'close',
@@ -216,16 +235,16 @@ export function DesktopSplitLayout() {
         {subPageOverlay && <div className={styles.desktopSplitPane}>{subPageOverlay}</div>}
 
         {/* Settings modal */}
-        <ChatModal chatId={settingsMatch?.id ?? null} activeChatId={activeChatId}>
+        <ChatModal chatId={settingsMatch?.id ?? null} routePath="/chats/chat/:id/settings">
           {(chatId, backAction) => <ChatSettingsCore chatId={chatId} backAction={backAction} />}
         </ChatModal>
 
         {/* Members modal */}
-        <ChatModal chatId={membersMatch?.id ?? null} activeChatId={activeChatId}>
+        <ChatModal chatId={membersMatch?.id ?? null} routePath="/chats/chat/:id/members">
           {(chatId, backAction) => <ChatMembersCore chatId={chatId} backAction={backAction} />}
         </ChatModal>
 
-        <ChatModal chatId={invitesMatch?.id ?? null} activeChatId={activeChatId}>
+        <ChatModal chatId={invitesMatch?.id ?? null} routePath="/chats/chat/:id/invites">
           {(chatId) => (
             <ChatInvitesCore
               chatId={chatId}
