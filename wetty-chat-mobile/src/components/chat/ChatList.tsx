@@ -28,6 +28,7 @@ import { Trans } from '@lingui/react/macro';
 import { markMessagesAsRead, type MessageResponse } from '@/api/messages';
 import { t } from '@lingui/core/macro';
 import { syncAppBadgeCount } from '@/utils/badges';
+import { getChatDisplayName } from '@/utils/chatDisplay';
 import { UserAvatar } from '@/components/UserAvatar';
 import { getMessagePreviewText } from './messagePreview';
 import styles from './ChatList.module.scss';
@@ -69,11 +70,6 @@ function formatLastActivity(isoString: string | null, locale: string): string {
   }
 }
 
-function chatDisplayName(chat: ChatListEntry): string {
-  if (chat.name && chat.name.trim()) return chat.name;
-  return t`Chat ${chat.id}`;
-}
-
 function isChatMuted(chat: ChatListEntry): boolean {
   if (!chat.muted_until) return false;
   return new Date(chat.muted_until) > new Date();
@@ -85,6 +81,7 @@ function getMessagePreview(message: MessageResponse | null): ReactNode {
   const senderName = message.sender?.name || 'User';
   const previewText = getMessagePreviewText({
     message: message.message,
+    messageType: message.message_type,
     attachments: message.attachments,
     isDeleted: message.is_deleted,
   });
@@ -243,7 +240,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
               >
                 <span slot="start">
                   <UserAvatar
-                    name={chatDisplayName(chat)}
+                    name={getChatDisplayName(chat.id, chat.name)}
                     avatarUrl={chat.avatar}
                     size={48}
                     className={styles.chatsListAvatar}
@@ -251,7 +248,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
                 </span>
                 <IonLabel className={styles.chatsListLabel}>
                   <h2 className={styles.chatsListTitle}>
-                    <span className={styles.chatsListTitleText}>{chatDisplayName(chat)}</span>
+                    <span className={styles.chatsListTitleText}>{getChatDisplayName(chat.id, chat.name)}</span>
                     {isChatMuted(chat) ? (
                       <IonIcon
                         aria-hidden="true"

@@ -127,7 +127,9 @@ function showLocalNotification(message: MessageResponse): void {
   const chatName = chatEntry?.details?.name ?? 'New Message';
 
   let body: string;
-  if (message.message) {
+  if (message.message_type === 'invite') {
+    body = `${message.sender.name ?? 'Someone'} sent an invite`;
+  } else if (message.message) {
     const preview =
       message.message.length > MESSAGE_PREVIEW_MAX
         ? message.message.slice(0, MESSAGE_PREVIEW_MAX) + '…'

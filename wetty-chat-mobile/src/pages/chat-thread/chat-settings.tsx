@@ -12,6 +12,7 @@ import {
   IonToolbar,
   useIonToast,
 } from '@ionic/react';
+import { linkOutline } from 'ionicons/icons';
 import { useHistory, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { t } from '@lingui/core/macro';
@@ -27,6 +28,8 @@ import type { BackAction } from '@/types/back-action';
 import styles from './ChatSettings.module.scss';
 import { FeatureGate } from '@/components/FeatureGate';
 import { ChatAdminSettings } from './ChatAdminSettings';
+import { ShareInviteModal } from '@/components/chat/settings/ShareInviteModal';
+import { GroupSettingsActionButton } from '@/components/chat/settings/GroupSettingsActionButton';
 
 interface ChatSettingsCoreProps {
   chatId?: string;
@@ -82,6 +85,8 @@ function ChatSettingsContent({
   onUploadAvatar,
   onSave,
 }: ChatSettingsContentProps) {
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+
   return (
     <>
       <GroupProfile
@@ -90,6 +95,12 @@ function ChatSettingsContent({
         description={formState.description}
         avatarUrl={formState.avatarUrl}
       />
+
+      <div className={styles.shareActions}>
+        <GroupSettingsActionButton icon={linkOutline} onClick={() => setShareModalOpen(true)}>
+          <Trans>Create Share Link</Trans>
+        </GroupSettingsActionButton>
+      </div>
 
       <IonListHeader>
         <IonLabel>
@@ -115,6 +126,8 @@ function ChatSettingsContent({
           onSave={onSave}
         />
       </FeatureGate>
+
+      <ShareInviteModal isOpen={shareModalOpen} chatId={chatId} onDismiss={() => setShareModalOpen(false)} />
     </>
   );
 }

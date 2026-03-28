@@ -35,12 +35,12 @@ const ComponentDemoPage: React.FC = () => {
       <IonContent>
         <h2>Component Demo</h2>
         <div style={{ border: '1px solid #333', borderLeft: 'none', borderRight: 'none' }}>
-          <MessageComposeBar onSend={(t) => console.log('send1:', t)} uploadAttachment={demoUploadAttachment} />
+          <MessageComposeBar onSend={(text) => console.log('send1:', text)} uploadAttachment={demoUploadAttachment} />
         </div>
         <div style={{ height: 100 }} />
         <div style={{ border: '1px solid #333', borderLeft: 'none', borderRight: 'none' }}>
           <MessageComposeBar
-            onSend={(t) => console.log('send2:', t)}
+            onSend={(text) => console.log('send2:', text)}
             uploadAttachment={demoUploadAttachment}
             replyTo={{
               messageId: '123',

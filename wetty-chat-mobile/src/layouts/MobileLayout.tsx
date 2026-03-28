@@ -9,6 +9,7 @@ import { CreateChatPage } from '@/pages/create-chat';
 import { ChatThreadPage } from '@/pages/chat-thread/chat-thread';
 import { ChatSettingsPage } from '@/pages/chat-thread/chat-settings';
 import { ChatMembersPage } from '@/pages/chat-thread/chat-members';
+import { ChatInvitesPage } from '@/pages/chat-thread/chat-invites';
 import SettingsPage from '@/pages/settings';
 import GeneralSettingsPage from '@/pages/settings/general';
 import LanguagePage from '@/pages/settings/language';
@@ -61,6 +62,7 @@ const MobileLayout: React.FC = () => {
         <Route path="/chats/chat/:id" exact component={ChatThreadPage} />
         <Route path="/chats/chat/:id/thread/:threadId" exact component={ChatThreadPage} />
         <Route path="/chats/chat/:id/settings" exact component={ChatSettingsPage} />
+        <Route path="/chats/chat/:id/invites" exact component={ChatInvitesPage} />
         <Route path="/chats/chat/:id/members" exact component={ChatMembersPage} />
         <Route path="/chats/chat/:id/details" exact component={GroupDetailPage} />
         <Route path="/demo" exact component={ComponentDemoPage} />

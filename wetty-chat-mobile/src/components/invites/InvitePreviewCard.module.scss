@@ -1,3 +1,8 @@
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
 .hero {
   display: flex;
   flex-direction: column;
@@ -32,17 +37,11 @@
   line-height: 1.5;
 }
 
-.meta {
+.loadingState {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-
-.chip {
-  --background: rgba(185, 153, 82, 0.14);
-  --color: #6f5418;
-  font-weight: 600;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 .status {

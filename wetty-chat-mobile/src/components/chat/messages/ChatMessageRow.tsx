@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { t } from '@lingui/core/macro';
 import type { MessageResponse, Sender } from '@/api/messages';
+import { InviteMessageModal } from '@/components/invites/InviteMessageModal';
 import { ChatBubble } from './ChatBubble';
+import { InviteMessageCard } from './InviteMessageCard';
 import { MessageDateSeparator } from './MessageDateSeparator';
 import { SystemMessage } from './SystemMessage';
 import type { ChatRow } from '../virtualScroll/types';
@@ -21,6 +24,10 @@ function isSystemMessage(message: MessageResponse): boolean {
   return message.message_type === 'system';
 }
 
+function isInviteMessage(message: MessageResponse): boolean {
+  return message.message_type === 'invite';
+}
+
 export function ChatMessageRow({
   row,
   currentUserId,
@@ -32,6 +39,8 @@ export function ChatMessageRow({
   onThreadClick,
   onReactionToggle,
 }: ChatMessageRowProps) {
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+
   if (row.type === 'date') {
     return <MessageDateSeparator label={row.dateLabel} />;
   }
@@ -40,6 +49,25 @@ export function ChatMessageRow({
   const replyToMessage = msg.reply_to_message;
   if (isSystemMessage(msg)) {
     return <SystemMessage message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')} />;
+  }
+
+  if (isInviteMessage(msg)) {
+    const code = msg.message?.trim() ?? '';
+    return (
+      <>
+        <InviteMessageCard
+          inviteCode={code}
+          sender={msg.sender}
+          isSent={msg.sender.uid === currentUserId}
+          showName={row.showName}
+          showAvatar={row.showAvatar}
+          timestamp={msg.created_at}
+          onAvatarClick={() => onAvatarClick(msg.sender)}
+          onOpen={() => setInviteCode(code)}
+        />
+        <InviteMessageModal inviteCode={inviteCode} onDismiss={() => setInviteCode(null)} />
+      </>
+    );
   }
 
   return (

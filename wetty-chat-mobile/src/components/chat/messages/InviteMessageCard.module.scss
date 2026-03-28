@@ -1,0 +1,152 @@
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 2px 8px;
+}
+
+.rowSent {
+  justify-content: flex-end;
+}
+
+.avatarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.avatarSpacer {
+  width: 32px;
+  flex: 0 0 32px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(85%, 360px);
+  min-width: 0;
+}
+
+.senderName {
+  padding: 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ion-color-medium-shade);
+}
+
+.card {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  width: 100%;
+}
+
+.ionCard {
+  margin: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: none;
+  --box-shadow: none;
+  border: 1px solid var(--ion-color-light-shade);
+}
+
+.cardSent .ionCard {
+  --background: var(--ion-color-step-50, #fcfcfc);
+}
+
+.cardHeader {
+  padding: 10px 14px 6px;
+}
+
+.cardSubtitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ion-color-primary);
+
+  ion-icon {
+    font-size: 0.9rem;
+  }
+}
+
+.groupItem {
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --inner-padding-end: 0;
+  --min-height: 72px;
+  --background: transparent;
+}
+
+.leadingVisual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.groupAvatar {
+  margin: 0;
+}
+
+.groupName {
+  margin: 0 0 4px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ion-text-color);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.groupDescription {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium-shade);
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.chevron {
+  font-size: 1.2rem;
+  color: var(--ion-color-medium);
+  margin-left: 8px;
+}
+
+.timestamp {
+  align-self: flex-end;
+  padding: 0 8px;
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+}
+
+/* Skeleton Styles */
+.skeletonAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin: 0;
+}
+
+.skeletonName {
+  width: 140px;
+  height: 18px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+}
+
+.skeletonDescription {
+  width: 100%;
+  height: 32px;
+  border-radius: 4px;
+}

@@ -20,10 +20,10 @@ import { FeatureGate } from '@/components/FeatureGate';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
 import { setChatMeta } from '@/store/chatsSlice';
+import { getChatDisplayName } from '@/utils/chatDisplay';
 
 function groupDisplayName(detail: GroupInfoResponse | null, id: string): string {
-  if (detail?.name?.trim()) return detail.name.trim();
-  return `Chat ${id}`;
+  return getChatDisplayName(id, detail?.name);
 }
 
 function avatarUrl(detail: GroupInfoResponse | null): string | null {

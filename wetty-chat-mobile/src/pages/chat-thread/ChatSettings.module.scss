@@ -4,6 +4,13 @@
   padding: 24px;
 }
 
+.shareActions {
+  display: flex;
+  justify-content: center;
+  padding: 16px 20px 8px;
+  background: var(--ion-color-light);
+}
+
 .hiddenFileInput {
   display: none;
 }

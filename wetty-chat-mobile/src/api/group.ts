@@ -49,6 +49,25 @@ export interface ListMembersResponse {
   can_manage_members: boolean;
 }
 
+export type GroupSearchMode = 'autocomplete' | 'submitted';
+export type GroupSelectorScope = 'manageable' | 'joined' | 'public';
+export type GroupRole = 'member' | 'admin';
+export type GroupVisibility = 'public' | 'semi_public' | 'private';
+
+export interface GroupSelectorItem {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar: string | null;
+  visibility: GroupVisibility;
+  role?: GroupRole | null;
+}
+
+export interface ListGroupsResponse {
+  groups: GroupSelectorItem[];
+  next_cursor: string | null;
+}
+
 export type MemberSearchMode = 'autocomplete' | 'submitted';
 
 export interface AddMemberBody {
@@ -66,6 +85,18 @@ export interface MuteChatBody {
 
 export function getGroupInfo(chatId: string | number): Promise<AxiosResponse<GroupInfoResponse>> {
   return apiClient.get(`/group/${chatId}`);
+}
+
+export function listGroups(
+  params: {
+    q?: string;
+    mode?: GroupSearchMode;
+    scope?: GroupSelectorScope;
+    limit?: number;
+    after?: string;
+  } = {},
+): Promise<AxiosResponse<ListGroupsResponse>> {
+  return apiClient.get('/group', { params });
 }
 
 export function updateGroupInfo(

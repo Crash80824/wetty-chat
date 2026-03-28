@@ -1,5 +1,6 @@
 import { Trans } from '@lingui/react/macro';
 import { UserAvatar } from '@/components/UserAvatar';
+import { getChatDisplayName } from '@/utils/chatDisplay';
 import styles from './GroupProfile.module.scss';
 
 interface GroupProfileProps {
@@ -10,17 +11,8 @@ interface GroupProfileProps {
   visibility?: 'public' | 'private';
 }
 
-function getDisplayName(chatId: string, name?: string | null): string {
-  const trimmedName = name?.trim();
-  if (trimmedName) {
-    return trimmedName;
-  }
-
-  return `Chat ${chatId}`;
-}
-
 export function GroupProfile({ chatId, name, description, avatarUrl }: GroupProfileProps) {
-  const displayName = getDisplayName(chatId, name);
+  const displayName = getChatDisplayName(chatId, name);
   const trimmedDescription = description?.trim() || null;
 
   return (

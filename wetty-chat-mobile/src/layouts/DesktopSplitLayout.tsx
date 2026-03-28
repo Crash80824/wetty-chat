@@ -7,6 +7,7 @@ import { ChatList } from '@/components/chat/ChatList';
 import ChatThreadCore from '@/pages/chat-thread/chat-thread';
 import ChatSettingsCore from '@/pages/chat-thread/chat-settings';
 import ChatMembersCore from '@/pages/chat-thread/chat-members';
+import ChatInvitesCore from '@/pages/chat-thread/chat-invites';
 import GroupDetailCore from '@/pages/group-detail';
 import CreateChatCore from '@/pages/create-chat';
 import { SettingsCore } from '@/pages/settings';
@@ -25,6 +26,7 @@ interface DesktopRouteMatches {
   threadMatch: { id: string; threadId: string } | null;
   settingsMatch: { id: string } | null;
   membersMatch: { id: string } | null;
+  invitesMatch: { id: string } | null;
   detailsMatch: { id: string } | null;
   isNewChat: boolean;
   globalSettings: boolean;
@@ -43,6 +45,10 @@ function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
   });
   const membersRaw = matchPath<{ id: string }>(pathname, {
     path: '/chats/chat/:id/members',
+    exact: true,
+  });
+  const invitesRaw = matchPath<{ id: string }>(pathname, {
+    path: '/chats/chat/:id/invites',
     exact: true,
   });
   const detailsRaw = matchPath<{ id: string }>(pathname, {
@@ -78,12 +84,14 @@ function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
       threadRaw?.params.id ??
       settingsRaw?.params.id ??
       membersRaw?.params.id ??
+      invitesRaw?.params.id ??
       detailsRaw?.params.id ??
       chatRaw?.params.id ??
       undefined,
     threadMatch: threadRaw?.params ?? null,
     settingsMatch: settingsRaw?.params ?? null,
     membersMatch: membersRaw?.params ?? null,
+    invitesMatch: invitesRaw?.params ?? null,
     detailsMatch: detailsRaw?.params ?? null,
     isNewChat: !!newRaw,
     globalSettings,
@@ -121,7 +129,7 @@ export function DesktopSplitLayout() {
   const currentRoute = getDesktopRouteMatches(location.pathname);
   const backgroundPath = location.state?.backgroundPath ?? '/chats';
   const baseRoute = currentRoute.globalSettings ? getDesktopRouteMatches(backgroundPath) : currentRoute;
-  const { activeChatId, threadMatch, settingsMatch, membersMatch, detailsMatch, isNewChat } = baseRoute;
+  const { activeChatId, threadMatch, settingsMatch, membersMatch, invitesMatch, detailsMatch, isNewChat } = baseRoute;
   const globalSettingsOpen = currentRoute.globalSettings;
 
   const handleChatSelect = useCallback(
@@ -228,6 +236,15 @@ export function DesktopSplitLayout() {
         {/* Members modal */}
         <ChatModal chatId={membersMatch?.id ?? null} activeChatId={activeChatId}>
           {(chatId, backAction) => <ChatMembersCore chatId={chatId} backAction={backAction} />}
+        </ChatModal>
+
+        <ChatModal chatId={invitesMatch?.id ?? null} activeChatId={activeChatId}>
+          {(chatId) => (
+            <ChatInvitesCore
+              chatId={chatId}
+              backAction={{ type: 'close', onClose: () => history.push(`/chats/chat/${chatId}/settings`) }}
+            />
+          )}
         </ChatModal>
 
         {/* Global settings modal */}

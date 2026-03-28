@@ -1,21 +1,53 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import axios, { HttpStatusCode } from 'axios';
-import { IonButton, IonChip, IonLabel, IonSpinner } from '@ionic/react';
+import { IonButton, IonSpinner } from '@ionic/react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { useDispatch } from 'react-redux';
 import { getChats } from '@/api/chats';
 import { type GroupInfoResponse } from '@/api/group';
-import { getInvitePreview, redeemInvite, type InvitePreviewResponse } from '@/api/invites';
+import { redeemInvite } from '@/api/invites';
 import { UserAvatar } from '@/components/UserAvatar';
 import type { AppDispatch } from '@/store';
 import { setChatMeta, setChatsList } from '@/store/chatsSlice';
+import { useInvitePreview } from './useInvitePreview';
 import styles from './InvitePreviewCard.module.scss';
 
-type PreviewState =
+type InviteAction = {
+  label: ReactNode;
+  fill?: 'clear' | 'outline' | 'solid';
+  disabled?: boolean;
+  onClick: () => void | Promise<void>;
+};
+
+type InviteViewState =
   | { kind: 'loading' }
-  | { kind: 'loaded'; data: InvitePreviewResponse }
-  | { kind: 'error'; title: string; message: string; status?: number };
+  | {
+      kind: 'error';
+      eyebrow: ReactNode;
+      title: string;
+      description: string;
+      statusMessage: string;
+      statusTone: 'error';
+    }
+  | {
+      kind: 'loaded';
+      eyebrow: ReactNode;
+      title: string;
+      description: string;
+      statusMessage?: string;
+      statusTone?: 'info' | 'error';
+      supporting?: ReactNode;
+      avatarUrl: string | null;
+      actions: [InviteAction, InviteAction];
+    };
+
+type InviteErrorCopy = {
+  title: string;
+  message: string;
+};
+
+type InviteErrorContext = 'preview' | 'redeem';
 
 export interface InvitePreviewCardProps {
   inviteCode: string;
@@ -23,37 +55,13 @@ export interface InvitePreviewCardProps {
   onCancel: () => void;
 }
 
-function chatDisplayName(preview: InvitePreviewResponse): string {
-  const name = preview.chat.name?.trim();
-  if (name) return name;
-  return t`Chat ${preview.chat.id}`;
-}
-
-function inviteTypeLabel(inviteType: string): string {
-  switch (inviteType) {
-    case 'group_member':
-      return t`Member invite`;
-    case 'user':
-      return t`Personal invite`;
-    case 'group':
-    default:
-      return t`Group invite`;
-  }
-}
-
-function visibilityLabel(visibility: string): string {
-  switch (visibility) {
-    case 'public':
-      return t`Public group`;
-    case 'private':
-      return t`Private group`;
-    default:
-      return visibility;
-  }
-}
-
-function buildPreviewError(status?: number): { title: string; message: string } {
+function buildInviteError(context: InviteErrorContext, status?: number): InviteErrorCopy {
   switch (status) {
+    case HttpStatusCode.Conflict:
+      return {
+        title: t`Invite unavailable`,
+        message: t`You are already a member of this chat.`,
+      };
     case HttpStatusCode.Forbidden:
       return {
         title: t`Invite unavailable`,
@@ -66,71 +74,63 @@ function buildPreviewError(status?: number): { title: string; message: string } 
       };
     default:
       return {
-        title: t`Could not load invite`,
-        message: t`Please try again in a moment.`,
+        title: context === 'preview' ? t`Could not load invite` : t`Could not join chat`,
+        message: context === 'preview' ? t`Please try again in a moment.` : t`We could not join this chat right now.`,
       };
   }
 }
 
-function buildRedeemError(status?: number): string {
-  switch (status) {
-    case HttpStatusCode.Conflict:
-      return t`You are already a member of this chat.`;
-    case HttpStatusCode.Forbidden:
-      return t`This invite is not available for your account.`;
-    case HttpStatusCode.BadRequest:
-      return t`This invite is invalid or has expired.`;
-    default:
-      return t`We could not join this chat right now.`;
-  }
-}
-
-export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePreviewCardProps) {
+function useInviteChatResolver(onResolved: InvitePreviewCardProps['onResolved']) {
   const dispatch = useDispatch<AppDispatch>();
-  const [previewState, setPreviewState] = useState<PreviewState>({ kind: 'loading' });
-  const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setPreviewState({ kind: 'loading' });
-    setJoinError(null);
+  return async (chat: GroupInfoResponse) => {
+    const { id, ...meta } = chat;
+    dispatch(setChatMeta({ chatId: id, meta }));
 
-    getInvitePreview(inviteCode)
-      .then((response) => {
-        if (cancelled) return;
-        setPreviewState({ kind: 'loaded', data: response.data });
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-        const mapped = buildPreviewError(status);
-        setPreviewState({ kind: 'error', ...mapped, status });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [inviteCode]);
-
-  const preview = previewState.kind === 'loaded' ? previewState.data : null;
-  const displayName = useMemo(() => (preview ? chatDisplayName(preview) : ''), [preview]);
-
-  const handleRefreshChats = async () => {
     try {
       const chatsResponse = await getChats();
       dispatch(setChatsList(chatsResponse.data.chats ?? []));
     } catch {
       // The chat thread can still load lazily after navigation.
     }
-  };
 
-  const handleResolve = async (chat: GroupInfoResponse) => {
-    const { id, ...meta } = chat;
-    dispatch(setChatMeta({ chatId: id, meta }));
-    await handleRefreshChats();
     await onResolved(chat);
   };
+}
+
+interface InviteHeroProps {
+  eyebrow: ReactNode;
+  title: string;
+  description: string;
+  avatarUrl?: string | null;
+}
+
+function InviteHero({ eyebrow, title, description, avatarUrl }: InviteHeroProps) {
+  return (
+    <div className={styles.hero}>
+      <UserAvatar name={title} avatarUrl={avatarUrl} size={96} className={styles.avatar} />
+      <p className={styles.eyebrow}>{eyebrow}</p>
+      <h1 className={styles.title}>{title}</h1>
+      <p className={styles.description}>{description}</p>
+    </div>
+  );
+}
+
+interface InviteStatusProps {
+  message: string;
+  tone?: 'info' | 'error';
+}
+
+function InviteStatus({ message, tone = 'info' }: InviteStatusProps) {
+  const className = tone === 'error' ? `${styles.status} ${styles.statusError}` : styles.status;
+  return <div className={className}>{message}</div>;
+}
+
+export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePreviewCardProps) {
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<InviteErrorCopy | null>(null);
+  const resolveChat = useInviteChatResolver(onResolved);
+  const { previewState, preview, displayName } = useInvitePreview(inviteCode);
 
   const handleJoin = async () => {
     if (!preview || joining || preview.already_member) return;
@@ -140,10 +140,10 @@ export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePr
 
     try {
       const response = await redeemInvite({ code: inviteCode });
-      await handleResolve(response.data.chat);
+      await resolveChat(response.data.chat);
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      setJoinError(buildRedeemError(status));
+      setJoinError(buildInviteError('redeem', status));
     } finally {
       setJoining(false);
     }
@@ -151,110 +151,112 @@ export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePr
 
   const openChat = async () => {
     if (!preview) return;
-    await handleResolve(preview.chat);
+    await resolveChat(preview.chat);
   };
 
+  const viewState: InviteViewState = (() => {
+    if (previewState.kind === 'loading') {
+      return { kind: 'loading' };
+    }
+
+    if (previewState.kind === 'error') {
+      const errorCopy = buildInviteError('preview', previewState.status);
+      return {
+        kind: 'error',
+        eyebrow: <Trans>Invite</Trans>,
+        title: errorCopy.title,
+        description: errorCopy.message,
+        statusMessage: errorCopy.message,
+        statusTone: 'error',
+      };
+    }
+
+    if (previewState.data.already_member) {
+      return {
+        kind: 'loaded',
+        eyebrow: <Trans>Invite</Trans>,
+        title: displayName,
+        description: t`You are already a member of this chat.`,
+        statusMessage: t`This invite points to a chat you already joined.`,
+        avatarUrl: previewState.data.chat.avatar,
+        actions: [
+          {
+            label: <Trans>Open chat</Trans>,
+            onClick: openChat,
+          },
+          {
+            label: <Trans>Back to chats</Trans>,
+            fill: 'clear',
+            onClick: onCancel,
+          },
+        ],
+      };
+    }
+
+    return {
+      kind: 'loaded',
+      eyebrow: <Trans>You’ve been invited</Trans>,
+      title: displayName,
+      description: previewState.data.chat.description?.trim() || t`Join this chat to start reading and sending messages.`,
+      statusMessage: joinError?.message,
+      statusTone: joinError ? 'error' : undefined,
+      supporting: <Trans>You can review the chat before joining. Nothing changes until you tap Join chat.</Trans>,
+      avatarUrl: previewState.data.chat.avatar,
+      actions: [
+        {
+          label: joining ? <Trans>Joining…</Trans> : <Trans>Join chat</Trans>,
+          disabled: joining,
+          onClick: handleJoin,
+        },
+        {
+          label: <Trans>Not now</Trans>,
+          fill: 'clear',
+          onClick: onCancel,
+        },
+      ],
+    };
+  })();
+
   return (
-    <>
-      {previewState.kind === 'loading' ? (
-        <div className={styles.hero}>
+    <div className={styles.card}>
+      {viewState.kind === 'loading' ? (
+        <div className={styles.loadingState}>
           <IonSpinner />
           <p className={styles.description}>
             <Trans>Loading invite…</Trans>
           </p>
         </div>
-      ) : previewState.kind === 'error' ? (
+      ) : viewState.kind === 'error' ? (
         <>
-          <div className={styles.hero}>
-            <p className={styles.eyebrow}>
-              <Trans>Invite</Trans>
-            </p>
-            <h1 className={styles.title}>{previewState.title}</h1>
-            <p className={styles.description}>{previewState.message}</p>
-          </div>
-          <div className={`${styles.status} ${styles.statusError}`}>{previewState.message}</div>
-        </>
-      ) : previewState.data.already_member ? (
-        <>
-          <div className={styles.hero}>
-            <UserAvatar
-              name={displayName}
-              avatarUrl={previewState.data.chat.avatar}
-              size={96}
-              className={styles.avatar}
-            />
-            <p className={styles.eyebrow}>
-              <Trans>Invite</Trans>
-            </p>
-            <h1 className={styles.title}>{displayName}</h1>
-            <p className={styles.description}>
-              <Trans>You are already a member of this chat.</Trans>
-            </p>
-            <div className={styles.meta}>
-              <IonChip className={styles.chip}>
-                <IonLabel>{inviteTypeLabel(previewState.data.invite.invite_type)}</IonLabel>
-              </IonChip>
-              <IonChip className={styles.chip}>
-                <IonLabel>{visibilityLabel(previewState.data.chat.visibility)}</IonLabel>
-              </IonChip>
-            </div>
-          </div>
-
-          <div className={styles.status}>
-            <Trans>This invite points to a chat you already joined.</Trans>
-          </div>
-
-          <div className={styles.actions}>
-            <IonButton expand="block" size="large" onClick={openChat}>
-              <Trans>Open chat</Trans>
-            </IonButton>
-            <IonButton expand="block" fill="clear" onClick={onCancel}>
-              <Trans>Back to chats</Trans>
-            </IonButton>
-          </div>
+          <InviteHero eyebrow={viewState.eyebrow} title={viewState.title} description={viewState.description} />
+          <InviteStatus message={viewState.statusMessage} tone={viewState.statusTone} />
         </>
       ) : (
         <>
-          <div className={styles.hero}>
-            <UserAvatar
-              name={displayName}
-              avatarUrl={previewState.data.chat.avatar}
-              size={96}
-              className={styles.avatar}
-            />
-            <p className={styles.eyebrow}>
-              <Trans>You’ve been invited</Trans>
-            </p>
-            <h1 className={styles.title}>{displayName}</h1>
-            <p className={styles.description}>
-              {previewState.data.chat.description?.trim() || t`Join this chat to start reading and sending messages.`}
-            </p>
-            <div className={styles.meta}>
-              <IonChip className={styles.chip}>
-                <IonLabel>{inviteTypeLabel(previewState.data.invite.invite_type)}</IonLabel>
-              </IonChip>
-              <IonChip className={styles.chip}>
-                <IonLabel>{visibilityLabel(previewState.data.chat.visibility)}</IonLabel>
-              </IonChip>
-            </div>
-          </div>
-
-          {joinError && <div className={`${styles.status} ${styles.statusError}`}>{joinError}</div>}
-
+          <InviteHero
+            eyebrow={viewState.eyebrow}
+            title={viewState.title}
+            description={viewState.description}
+            avatarUrl={viewState.avatarUrl}
+          />
+          {viewState.statusMessage ? <InviteStatus message={viewState.statusMessage} tone={viewState.statusTone} /> : null}
           <div className={styles.actions}>
-            <IonButton expand="block" size="large" onClick={handleJoin} disabled={joining}>
-              {joining ? <Trans>Joining…</Trans> : <Trans>Join chat</Trans>}
-            </IonButton>
-            <IonButton expand="block" fill="clear" onClick={onCancel}>
-              <Trans>Not now</Trans>
-            </IonButton>
+            {viewState.actions.map((action, index) => (
+              <IonButton
+                key={index}
+                expand="block"
+                size="large"
+                fill={action.fill}
+                disabled={action.disabled}
+                onClick={action.onClick}
+              >
+                {action.label}
+              </IonButton>
+            ))}
           </div>
-
-          <p className={styles.supporting}>
-            <Trans>You can review the chat before joining. Nothing changes until you tap Join chat.</Trans>
-          </p>
+          {viewState.supporting ? <p className={styles.supporting}>{viewState.supporting}</p> : null}
         </>
       )}
-    </>
+    </div>
   );
 }
