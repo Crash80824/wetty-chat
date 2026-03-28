@@ -124,6 +124,13 @@ const chatsSlice = createSlice({
         muted_until: action.payload.mutedUntil,
       };
     },
+    setChatInList(state, action: PayloadAction<{ chatId: string; inList: boolean }>) {
+      const entry = getChatEntry(state, action.payload.chatId);
+      entry.liveProjection = {
+        ...entry.liveProjection,
+        in_list: action.payload.inList,
+      };
+    },
     projectChatMessageAdded(
       state,
       action: PayloadAction<{ chatId: string; message: MessageResponse; incrementUnread: boolean }>,
@@ -247,6 +254,7 @@ export const {
   setChatsMeta,
   setChatsList,
   setChatMutedUntil,
+  setChatInList,
   projectChatMessageAdded,
   projectChatMessageConfirmed,
   setChatUnreadCount,

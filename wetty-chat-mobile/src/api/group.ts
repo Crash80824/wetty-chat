@@ -129,6 +129,10 @@ export function removeMember(chatId: string | number, uid: number): Promise<Axio
   return apiClient.delete(`/group/${chatId}/members/${uid}`);
 }
 
+export function leaveGroup(chatId: string | number, uid: number): Promise<AxiosResponse<void>> {
+  return apiClient.delete(`/group/${chatId}/members/${uid}`);
+}
+
 export function updateMemberRole(
   chatId: string | number,
   uid: number,

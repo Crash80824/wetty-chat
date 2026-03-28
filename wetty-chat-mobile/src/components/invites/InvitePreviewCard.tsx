@@ -102,13 +102,14 @@ interface InviteHeroProps {
   eyebrow: ReactNode;
   title: string;
   description: string;
+  showAvatar?: boolean;
   avatarUrl?: string | null;
 }
 
-function InviteHero({ eyebrow, title, description, avatarUrl }: InviteHeroProps) {
+function InviteHero({ eyebrow, title, description, showAvatar = false, avatarUrl }: InviteHeroProps) {
   return (
     <div className={styles.hero}>
-      {avatarUrl ? <UserAvatar name={title} avatarUrl={avatarUrl} size={96} className={styles.avatar} /> : null}
+      {showAvatar ? <UserAvatar name={title} avatarUrl={avatarUrl} size={96} className={styles.avatar} /> : null}
       <p className={styles.eyebrow}>{eyebrow}</p>
       <h1 className={styles.title}>{title}</h1>
       <p className={styles.description}>{description}</p>
@@ -200,7 +201,7 @@ export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePr
       description: previewState.data.chat.description?.trim() || t`Join this chat to start reading and sending messages.`,
       statusMessage: joinError?.message,
       statusTone: joinError ? 'error' : undefined,
-      supporting: <Trans>You can review the chat before joining. Nothing changes until you tap Join chat.</Trans>,
+      supporting: <Trans>Review to confirm if you want to join. Nothing changes until you click join.</Trans>,
       avatarUrl: previewState.data.chat.avatar,
       actions: [
         {
@@ -228,7 +229,13 @@ export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePr
         </div>
       ) : viewState.kind === 'error' ? (
         <>
-          <InviteHero eyebrow={viewState.eyebrow} title={viewState.title} description={viewState.description} avatarUrl={null} />
+          <InviteHero
+            eyebrow={viewState.eyebrow}
+            title={viewState.title}
+            description={viewState.description}
+            showAvatar={false}
+            avatarUrl={null}
+          />
           <InviteStatus message={viewState.statusMessage} tone={viewState.statusTone} />
         </>
       ) : (
@@ -237,6 +244,7 @@ export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePr
             eyebrow={viewState.eyebrow}
             title={viewState.title}
             description={viewState.description}
+            showAvatar
             avatarUrl={viewState.avatarUrl}
           />
           {viewState.statusMessage ? <InviteStatus message={viewState.statusMessage} tone={viewState.statusTone} /> : null}

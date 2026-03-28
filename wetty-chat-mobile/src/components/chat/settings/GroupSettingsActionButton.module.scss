@@ -42,3 +42,12 @@
 .button:focus-visible .content {
   color: var(--ion-color-primary-shade);
 }
+
+.danger {
+  --color: var(--ion-color-danger);
+}
+
+.danger:hover .content,
+.danger:focus-visible .content {
+  color: var(--ion-color-danger-shade);
+}

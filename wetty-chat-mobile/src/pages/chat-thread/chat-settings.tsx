@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  useIonAlert,
   IonButtons,
   IonContent,
   IonHeader,
@@ -9,14 +10,14 @@ import {
   IonToolbar,
   useIonToast,
 } from '@ionic/react';
-import { linkOutline } from 'ionicons/icons';
+import { exitOutline, linkOutline } from 'ionicons/icons';
 import { useHistory, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
-import { selectChatMeta, selectChatMutedUntil, setChatMeta } from '@/store/chatsSlice';
+import { selectChatMeta, selectChatMutedUntil, setChatInList, setChatMeta } from '@/store/chatsSlice';
 import type { RootState } from '@/store/index';
-import { getGroupInfo, requestGroupAvatarUploadUrl, updateGroupInfo, type GroupRole } from '@/api/group';
+import { getGroupInfo, leaveGroup, requestGroupAvatarUploadUrl, updateGroupInfo, type GroupRole } from '@/api/group';
 import { uploadFileToS3 } from '@/api/upload';
 import { BackButton } from '@/components/BackButton';
 import { GroupProfile } from '@/components/chat/GroupProfile';
@@ -67,11 +68,13 @@ interface ChatSettingsContentProps {
   mutedUntil: string | null;
   myRole: GroupRole | null;
   saving: boolean;
+  leavingGroup: boolean;
   uploadingAvatar: boolean;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onVisibilityChange: (value: 'public' | 'private') => void;
   onUploadAvatar: (file: File) => Promise<void>;
+  onLeaveGroup: () => void;
   onSave: () => void;
 }
 
@@ -81,11 +84,13 @@ function ChatSettingsContent({
   mutedUntil,
   myRole,
   saving,
+  leavingGroup,
   uploadingAvatar,
   onNameChange,
   onDescriptionChange,
   onVisibilityChange,
   onUploadAvatar,
+  onLeaveGroup,
   onSave,
 }: ChatSettingsContentProps) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -107,6 +112,10 @@ function ChatSettingsContent({
             <Trans>Invite Link</Trans>
           </GroupSettingsActionButton>
         </ChatRoleGate>
+
+        <GroupSettingsActionButton icon={exitOutline} tone="danger" disabled={leavingGroup} onClick={onLeaveGroup}>
+          <Trans>Leave Group</Trans>
+        </GroupSettingsActionButton>
       </div>
 
       <FeatureGate>
@@ -143,11 +152,14 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
   const history = useHistory();
   const dispatch = useDispatch();
   const [presentToast] = useIonToast();
+  const [presentAlert] = useIonAlert();
   const cachedMeta = useSelector((state: RootState) => selectChatMeta(state, chatId));
   const mutedUntil = useSelector((state: RootState) => selectChatMutedUntil(state, chatId));
+  const currentUserId = useSelector((state: RootState) => state.user.uid);
   const [formState, setFormState] = useState<ChatSettingsFormState>(() => getInitialFormState(cachedMeta));
   const [loading, setLoading] = useState(() => !hasLoadedChatSettingsMeta(cachedMeta));
   const [saving, setSaving] = useState(false);
+  const [leavingGroup, setLeavingGroup] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
@@ -263,6 +275,37 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
       .finally(() => setSaving(false));
   };
 
+  const handleLeaveGroup = () => {
+    if (!currentUserId || leavingGroup) {
+      return;
+    }
+
+    presentAlert({
+      header: t`Leave Group`,
+      message: t`Are you sure you want to leave this group?`,
+      buttons: [
+        { text: t`Cancel`, role: 'cancel' },
+        {
+          text: t`Leave`,
+          role: 'destructive',
+          handler: () => {
+            setLeavingGroup(true);
+            leaveGroup(chatId, currentUserId)
+              .then(() => {
+                dispatch(setChatInList({ chatId, inList: false }));
+                presentToast({ message: t`Left group`, duration: 2000 });
+                history.replace('/chats');
+              })
+              .catch((err: Error) => {
+                presentToast({ message: err.message || t`Failed to leave group`, duration: 3000 });
+              })
+              .finally(() => setLeavingGroup(false));
+          },
+        },
+      ],
+    });
+  };
+
   const updateFormState = <K extends keyof ChatSettingsFormState>(key: K, value: ChatSettingsFormState[K]) => {
     setFormState((current) => ({ ...current, [key]: value }));
   };
@@ -289,11 +332,13 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
             mutedUntil={mutedUntil}
             myRole={formState.myRole}
             saving={saving}
+            leavingGroup={leavingGroup}
             uploadingAvatar={uploadingAvatar}
             onNameChange={(value) => updateFormState('name', value)}
             onDescriptionChange={(value) => updateFormState('description', value)}
             onVisibilityChange={(value) => updateFormState('visibility', value)}
             onUploadAvatar={handleAvatarUpload}
+            onLeaveGroup={handleLeaveGroup}
             onSave={handleSave}
           />
         )}
