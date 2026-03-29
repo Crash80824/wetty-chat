@@ -16,8 +16,7 @@ import { GeneralSettingsCore } from '@/pages/settings/general';
 import { LanguagePageCore } from '@/pages/settings/language';
 import type { BackAction } from '@/types/back-action';
 import styles from './DesktopSplitLayout.module.scss';
-import { FeatureGate } from '@/components/FeatureGate';
-import { HeaderActionMenu } from '@/components/HeaderActionMenu';
+import { HeaderActionMenu, type HeaderActionMenuItem } from '@/components/HeaderActionMenu';
 
 interface DesktopRouteState {
   backgroundPath?: string;
@@ -152,6 +151,22 @@ export function DesktopSplitLayout() {
   const history = useHistory();
   const location = useLocation<DesktopRouteState | undefined>();
   const skipNextGlobalSettingsDismiss = useRef(false);
+  const headerActions: HeaderActionMenuItem[] = [
+    ...(import.meta.env.DEV
+      ? [
+          {
+            id: 'create-chat',
+            label: <Trans>Create Chat</Trans>,
+            onSelect: () => history.push('/chats/new'),
+          },
+        ]
+      : []),
+    {
+      id: 'join-via-code',
+      label: <Trans>Join via Code</Trans>,
+      onSelect: () => history.push('/chats/join'),
+    },
+  ];
   const currentRoute = getDesktopRouteMatches(location.pathname);
   const backgroundPath = location.state?.backgroundPath ?? '/chats';
   const baseRoute = currentRoute.globalSettings ? getDesktopRouteMatches(backgroundPath) : currentRoute;
@@ -228,23 +243,7 @@ export function DesktopSplitLayout() {
               <Trans>Chats</Trans>
             </IonTitle>
             <IonButtons slot="end">
-              <FeatureGate>
-                <HeaderActionMenu
-                  icon={createOutline}
-                  actions={[
-                    {
-                      id: 'create-chat',
-                      label: <Trans>Create Chat</Trans>,
-                      onSelect: () => history.push('/chats/new'),
-                    },
-                    {
-                      id: 'join-via-code',
-                      label: <Trans>Join via Code</Trans>,
-                      onSelect: () => history.push('/chats/join'),
-                    },
-                  ]}
-                />
-              </FeatureGate>
+              <HeaderActionMenu icon={createOutline} actions={headerActions} />
             </IonButtons>
           </IonToolbar>
         </IonHeader>

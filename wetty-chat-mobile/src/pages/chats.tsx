@@ -7,19 +7,24 @@ import { HeaderActionMenu } from '@/components/HeaderActionMenu';
 import { TitleWithConnectionStatus } from '@/components/TitleWithConnectionStatus';
 
 export default function Chats() {
+  const isDev = import.meta.env.DEV;
   const history = useHistory();
-  const menuActions = [
-    {
-      id: 'create-chat',
-      label: <Trans>Create Chat</Trans>,
-      onSelect: () => history.push('/chats/new'),
-    },
+  let menuActions = [
     {
       id: 'join-via-code',
       label: <Trans>Join via Code</Trans>,
       onSelect: () => history.push('/chats/join'),
     },
   ];
+  if (isDev) {
+    menuActions.push(
+      {
+        id: 'create-chat',
+        label: <Trans>Create Chat</Trans>,
+        onSelect: () => history.push('/chats/new'),
+      }
+    )
+  }
 
   return (
     <IonPage className="chats-page">
