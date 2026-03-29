@@ -10,8 +10,10 @@
   --padding-start: 18px;
   --padding-end: 18px;
   margin: 0;
-  min-width: 128px;
-  min-height: 96px;
+  aspect-ratio: 1;
+  min-width: 75px;
+  max-width: 25%;
+  width: 128px;
   text-transform: none;
 }
 

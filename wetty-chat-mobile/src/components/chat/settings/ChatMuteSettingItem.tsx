@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useIonActionSheet, useIonToast } from '@ionic/react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
@@ -30,42 +31,34 @@ function formatMutedUntil(locale: string, mutedUntil: string): string | null {
   }
 
   const diffMs = date.getTime() - now.getTime();
-  const diffMinutes = Math.round(diffMs / 60000);
-  const diffHours = Math.round(diffMs / 3600000);
-  const diffDays = Math.round(diffMs / 86400000);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
 
-  if (Math.abs(diffMinutes) < 60) {
-    return rtf.format(diffMinutes === 0 ? 1 : diffMinutes, 'minute');
+  if (diffMs < 24 * 60 * 60 * 1000) {
+    return Intl.DateTimeFormat(locale, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
   }
-
-  if (Math.abs(diffHours) < 24) {
-    return rtf.format(diffHours, 'hour');
-  }
-
-  if (Math.abs(diffDays) < 7) {
-    return rtf.format(diffDays, 'day');
-  }
-
-  const isSameYear = date.getFullYear() === now.getFullYear();
 
   return Intl.DateTimeFormat(locale, {
-    ...(isSameYear ? {} : { year: 'numeric' }),
     month: 'short',
     day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
   }).format(date);
 }
 
-function getMutedUntilLabel(locale: string, mutedUntil: string): string {
+function getMutedUntilLabel(locale: string, mutedUntil: string): ReactNode {
   if (new Date(mutedUntil).getFullYear() >= 9000) {
-    return t`Muted indefinitely`;
+    return t`indefinitely`;
   }
 
   const formatted = formatMutedUntil(locale, mutedUntil);
 
-  return t`Muted until ${formatted ?? mutedUntil}`;
+  return (
+    <>
+      <Trans>until</Trans>{' '}
+      <wbr />
+      <span style={{ whiteSpace: 'nowrap' }}>{formatted ?? mutedUntil}</span>
+    </>
+  );
 }
 
 export function ChatMuteSettingItem({ chatId, mutedUntil }: ChatMuteSettingItemProps) {

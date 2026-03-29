@@ -109,12 +109,12 @@ function ChatSettingsContent({
 
         <ChatRoleGate chatId={chatId} allow="admin" role={myRole}>
           <GroupSettingsActionButton icon={linkOutline} onClick={() => setShareModalOpen(true)}>
-            <Trans>Invite Link</Trans>
+            <Trans>Invite</Trans>
           </GroupSettingsActionButton>
         </ChatRoleGate>
 
         <GroupSettingsActionButton icon={exitOutline} tone="danger" disabled={leavingGroup} onClick={onLeaveGroup}>
-          <Trans>Leave Group</Trans>
+          <Trans>Leave</Trans>
         </GroupSettingsActionButton>
       </div>
 
