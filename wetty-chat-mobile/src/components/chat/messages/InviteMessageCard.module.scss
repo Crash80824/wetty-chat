@@ -55,11 +55,13 @@
 
 .ionCard {
   margin: 0;
+  height: 112px;
   overflow: hidden;
   border-radius: 14px;
   box-shadow: none;
   --box-shadow: none;
   border: 1px solid var(--ion-color-light-shade);
+  box-sizing: border-box;
 }
 
 .cardSent .ionCard {
@@ -111,7 +113,13 @@
   margin: 0 0 4px;
   font-weight: 700;
   font-size: 1rem;
+  line-height: 1.25;
   color: var(--ion-text-color);
+  min-height: 1.25em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -121,6 +129,11 @@
   font-size: 0.875rem;
   color: var(--ion-color-medium-shade);
   line-height: 1.3;
+  min-height: calc(2 * 1.3em);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -155,6 +168,6 @@
 
 .skeletonDescription {
   width: 100%;
-  height: 32px;
+  height: calc(2 * 0.875rem * 1.3);
   border-radius: 4px;
 }
