@@ -131,18 +131,14 @@ fn validate_sticker_emoji(input: &str) -> Result<String, (StatusCode, &'static s
         return Err((StatusCode::BAD_REQUEST, "Invalid emoji"));
     }
 
-    if !input.chars().all(|c| {
-        unic_emoji_char::is_emoji(c)
-            || c == '\u{200D}'
-            || c == '\u{FE0E}'
-            || c == '\u{FE0F}'
-            || ('\u{1F3FB}'..='\u{1F3FF}').contains(&c)
-    }) {
-        return Err((StatusCode::BAD_REQUEST, "Invalid emoji"));
+    let graphemes: Vec<&str> = input.graphemes(true).collect();
+
+    if graphemes.len() > MAX_STICKER_EMOJI_GRAPHEMES {
+        return Err((StatusCode::BAD_REQUEST, "Too many emoji"));
     }
 
-    if input.graphemes(true).count() > MAX_STICKER_EMOJI_GRAPHEMES {
-        return Err((StatusCode::BAD_REQUEST, "Too many emoji"));
+    if !graphemes.iter().all(|g| emojis::get(g).is_some()) {
+        return Err((StatusCode::BAD_REQUEST, "Invalid emoji"));
     }
 
     Ok(input.to_string())
