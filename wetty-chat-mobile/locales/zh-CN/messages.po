@@ -35,6 +35,10 @@ msgid "[Invite]"
 msgstr "[邀请]"
 
 #: src/components/chat/messagePreview.ts
+msgid "[Sticker]"
+msgstr "[贴纸]"
+
+#: src/components/chat/messagePreview.ts
 #: src/components/chat/messagePreview.ts
 msgid "[Video]"
 msgstr "[视频]"
@@ -78,6 +82,7 @@ msgstr "发现新版本！"
 msgid "About"
 msgstr "关于"
 
+#: src/components/chat/compose/AddStickerModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Add"
 msgstr "添加"
@@ -86,6 +91,19 @@ msgstr "添加"
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Add Member"
 msgstr "添加成员"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Add sticker"
+msgstr "添加贴纸"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Add Sticker"
+msgstr "添加贴纸"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Add to Favorites"
+msgstr "添加到收藏"
 
 #: src/pages/settings/general.tsx
 msgid "Alex"
@@ -148,6 +166,8 @@ msgstr "返回聊天列表"
 msgid "Blocked"
 msgstr "已阻止"
 
+#: src/components/chat/compose/AddStickerModal.tsx
+#: src/components/chat/compose/StickerPicker.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
@@ -157,6 +177,9 @@ msgstr "已阻止"
 #: src/pages/chat-thread/chat-settings.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/manage-invites.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/stickers.tsx
 msgid "Cancel"
 msgstr "取消"
 
@@ -190,6 +213,10 @@ msgstr "选择目标群组"
 msgid "Choose a new image to replace the current avatar."
 msgstr "选择一张新图片以替换当前头像。"
 
+#: src/components/shared/EmojiInput.tsx
+msgid "Choose Emoji"
+msgstr "选择表情"
+
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Choose the member group first"
 msgstr "请先选择成员群组"
@@ -203,10 +230,15 @@ msgstr "此设备不支持剪贴板"
 #: src/components/chat/ReactionDetailsModal.tsx
 #: src/components/chat/settings/ShareInviteGroupSelectorModal.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
+#: src/components/chat/StickerPreviewModal.tsx
 #: src/components/chat/UserProfileModal.tsx
 #: src/components/invites/InviteMessageModal.tsx
 msgid "Close"
 msgstr "关闭"
+
+#: src/components/shared/EmojiInput.tsx
+msgid "Close emoji picker"
+msgstr "关闭表情选择器"
 
 #: src/components/chat/ImageViewer.tsx
 msgid "Close viewer"
@@ -246,6 +278,11 @@ msgstr "无法加载邀请"
 msgid "Could not validate invite code"
 msgstr "无法验证邀请码"
 
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Create"
+msgstr "创建"
+
 #: src/layouts/DesktopSplitLayout.tsx
 #: src/pages/chats.tsx
 msgid "Create Chat"
@@ -254,6 +291,14 @@ msgstr "创建聊天"
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Create Invite"
 msgstr "创建邀请"
+
+#: src/pages/settings/stickers.tsx
+msgid "Create New Pack"
+msgstr "创建新贴纸包"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Create new sticker pack"
+msgstr "创建新的贴纸包"
 
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
@@ -304,6 +349,10 @@ msgstr "下载"
 msgid "Download image"
 msgstr "下载图片"
 
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "e.g. 😊"
+msgstr "例如 😊"
+
 #: src/components/chat/ChatVirtualScroll.tsx
 msgid "Earlier messages"
 msgstr "更早的消息"
@@ -317,8 +366,13 @@ msgid "Edit message"
 msgstr "编辑消息"
 
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "Edited"
 msgstr "已编辑"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Emoji"
+msgstr "表情"
 
 #: src/pages/join-chat.tsx
 msgid "Enter an invite code"
@@ -362,6 +416,11 @@ msgstr "过期时间"
 msgid "Failed to add member"
 msgstr "添加成员失败"
 
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to add sticker"
+msgstr "添加贴纸失败"
+
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Failed to copy invite code"
@@ -370,6 +429,11 @@ msgstr "复制邀请码失败"
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Failed to create invite"
 msgstr "创建邀请失败"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Failed to create sticker pack"
+msgstr "创建贴纸包失败"
 
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to delete message"
@@ -421,6 +485,18 @@ msgstr "加载更多失败"
 msgid "Failed to load newer messages"
 msgstr "加载新消息失败"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to load sticker pack"
+msgstr "加载贴纸包失败"
+
+#: src/pages/settings/stickers.tsx
+msgid "Failed to load sticker packs"
+msgstr "加载贴纸包失败"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Failed to load stickers"
+msgstr "加载贴纸失败"
+
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Failed to mute"
 msgstr "静音失败"
@@ -433,6 +509,10 @@ msgstr "刷新聊天失败"
 msgid "Failed to remove member"
 msgstr "移除成员失败"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to remove sticker"
+msgstr "移除贴纸失败"
+
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Failed to revoke invite"
 msgstr "撤销邀请失败"
@@ -441,6 +521,7 @@ msgstr "撤销邀请失败"
 msgid "Failed to save settings"
 msgstr "保存设置失败"
 
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to send"
@@ -469,6 +550,14 @@ msgstr "开启推送通知失败"
 msgid "Failed to unmute"
 msgstr "取消静音失败"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to unsubscribe"
+msgstr "取消订阅失败"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Failed to update favorites"
+msgstr "更新收藏失败"
+
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Failed to update role"
 msgstr "更新角色失败"
@@ -476,6 +565,10 @@ msgstr "更新角色失败"
 #: src/pages/chat-thread/chat-settings.tsx
 msgid "Failed to upload avatar"
 msgstr "上传头像失败"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Favorites"
+msgstr "收藏"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Forever"
@@ -612,7 +705,9 @@ msgid "Loading invite…"
 msgstr "正在加载邀请…"
 
 #: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/StickerPreviewModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 msgid "Loading..."
 msgstr "正在加载..."
 
@@ -688,6 +783,14 @@ msgstr "静音通知"
 #~ msgid "Muted until {0}"
 #~ msgstr "已静音至 {0}"
 
+#: src/pages/settings/stickers.tsx
+msgid "My Packs"
+msgstr "我的贴纸包"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Name"
+msgstr "名称"
+
 #: src/components/chat/settings/shareInviteHelpers.ts
 #: src/components/chat/settings/shareInviteHelpers.ts
 #: src/pages/chat-thread/manage-invites.tsx
@@ -697,6 +800,11 @@ msgstr "永不"
 #: src/components/chat/ChatList.tsx
 msgid "New message"
 msgstr "新消息"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "New Sticker Pack"
+msgstr "新贴纸包"
 
 #: src/components/chat/ChatVirtualScroll.tsx
 msgid "Newer messages"
@@ -747,6 +855,14 @@ msgstr "暂无消息"
 msgid "No service worker registered"
 msgstr "未注册 Service Worker"
 
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "No stickers"
+msgstr "没有贴纸"
+
+#: src/pages/settings/stickers.tsx
+msgid "No subscribed packs"
+msgstr "没有已订阅的贴纸包"
+
 #: src/components/invites/InvitePreviewCard.tsx
 msgid "Not now"
 msgstr "暂不"
@@ -780,9 +896,26 @@ msgstr "打开聊天"
 msgid "Open chat actions"
 msgstr "打开聊天操作"
 
+#: src/components/shared/EmojiInput.tsx
+msgid "Open emoji picker"
+msgstr "打开表情选择器"
+
 #: src/components/chat/messages/InviteMessageCard.tsx
 msgid "Open this invite to view the group and join."
 msgstr "打开此邀请以查看群组并加入。"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Optional"
+msgstr "可选"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Pack"
+msgstr "贴纸包"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Pack name"
+msgstr "贴纸包名称"
 
 #: src/pages/join-chat.tsx
 msgid "Paste code"
@@ -795,6 +928,11 @@ msgstr "权限"
 #: src/pages/chat-thread/chat-settings.tsx
 msgid "Please choose an image file"
 msgstr "请选择图片文件"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+#: src/components/shared/EmojiInput.tsx
+msgid "Please choose at least one emoji"
+msgstr "请至少选择一个表情"
 
 #: src/components/invites/InvitePreviewCard.tsx
 msgid "Please try again in a moment."
@@ -884,6 +1022,7 @@ msgid "Release to save"
 msgstr "松开保存"
 
 #: src/pages/chat-thread/chat-members.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 msgid "Remove"
 msgstr "移除"
 
@@ -896,6 +1035,10 @@ msgstr "移除 {0}"
 msgid "Remove {displayName} from this group?"
 msgstr "将 {displayName} 从该群组中移除？"
 
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Remove from Favorites"
+msgstr "从收藏中移除"
+
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Remove from Group"
 msgstr "从群组中移除"
@@ -904,15 +1047,30 @@ msgstr "从群组中移除"
 msgid "Remove Member"
 msgstr "移除成员"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Remove Sticker"
+msgstr "移除贴纸"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Remove this pack from your collection?"
+msgstr "要将这个贴纸包从你的收藏中移除吗？"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Remove this sticker from the pack?"
+msgstr "要从贴纸包中移除此贴纸吗？"
+
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "replies"
 msgstr "条回复"
 
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "reply"
 msgstr "条回复"
 
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Reply"
 msgstr "回复"
@@ -950,6 +1108,10 @@ msgstr "保存设置"
 #: src/pages/chat-thread/ChatAdminSettings.tsx
 msgid "Saving..."
 msgstr "保存中..."
+
+#: src/components/shared/EmojiInput.tsx
+msgid "Search emoji"
+msgstr "搜索表情"
 
 #: src/components/group-selector/GroupSelector.tsx
 msgid "Search groups"
@@ -1018,12 +1180,44 @@ msgid "Status"
 msgstr "状态"
 
 #: src/components/chat/compose/ComposeInput.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "Sticker"
 msgstr "贴纸"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Sticker added"
+msgstr "贴纸已添加"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Sticker packs"
+msgstr "贴纸包"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+#: src/components/chat/StickerPreviewModal.tsx
+msgid "Sticker preview"
+msgstr "贴纸预览"
+
+#: src/components/chat/StickerPreviewModal.tsx
+msgid "stickers"
+msgstr "张贴纸"
+
+#: src/pages/settings.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Stickers"
+msgstr "贴纸"
+
+#: src/components/chat/StickerPreviewModal.tsx
+msgid "Subscribe"
+msgstr "订阅"
 
 #: src/pages/settings.tsx
 msgid "Subscribed"
 msgstr "已订阅"
+
+#: src/pages/settings/stickers.tsx
+msgid "Subscribed Packs"
+msgstr "已订阅的贴纸包"
 
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Targeted"
@@ -1077,6 +1271,13 @@ msgstr "开启推送通知"
 #: src/components/chat/ChatList.tsx
 msgid "Unread"
 msgstr "标记未读"
+
+#: src/components/chat/StickerPreviewModal.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Unsubscribe"
+msgstr "取消订阅"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "until"

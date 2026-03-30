@@ -1,8 +1,9 @@
-import { useRef } from 'react';
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonModal, IonTitle, IonToolbar } from '@ionic/react';
+import { useEffect, useMemo, useState } from 'react';
+import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonInput, IonModal, IonTitle, IonToolbar } from '@ionic/react';
 import { close } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
+import { EmojiInput } from '@/components/shared/EmojiInput';
 import styles from './AddStickerModal.module.scss';
 
 interface AddStickerModalProps {
@@ -12,17 +13,7 @@ interface AddStickerModalProps {
 }
 
 export function AddStickerModal({ file, onDismiss, onAdd }: AddStickerModalProps) {
-  const emojiRef = useRef<HTMLIonInputElement>(null);
-  const nameRef = useRef<HTMLIonInputElement>(null);
-
-  const previewUrl = file ? URL.createObjectURL(file) : null;
-
-  const handleAdd = () => {
-    const emoji = String(emojiRef.current?.value ?? '').trim();
-    if (!file || !emoji) return;
-    const name = String(nameRef.current?.value ?? '').trim();
-    onAdd(file, emoji, name);
-  };
+  const fileKey = file ? `${file.name}:${file.size}:${file.lastModified}` : 'empty';
 
   return (
     <IonModal
@@ -31,6 +22,38 @@ export function AddStickerModal({ file, onDismiss, onAdd }: AddStickerModalProps
       initialBreakpoint={0.6}
       breakpoints={[0, 0.6]}
     >
+      {file ? <AddStickerModalForm key={fileKey} file={file} onDismiss={onDismiss} onAdd={onAdd} /> : null}
+    </IonModal>
+  );
+}
+
+interface AddStickerModalFormProps {
+  file: File;
+  onDismiss: () => void;
+  onAdd: (file: File, emoji: string, name: string) => void;
+}
+
+function AddStickerModalForm({ file, onDismiss, onAdd }: AddStickerModalFormProps) {
+  const [emoji, setEmoji] = useState('');
+  const [name, setName] = useState('');
+  const [showEmojiError, setShowEmojiError] = useState(false);
+  const previewUrl = useMemo(() => URL.createObjectURL(file), [file]);
+
+  useEffect(() => () => {
+    URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  const handleAdd = () => {
+    const trimmedEmoji = emoji.trim();
+    if (!trimmedEmoji) {
+      setShowEmojiError(true);
+      return;
+    }
+    onAdd(file, trimmedEmoji, name.trim());
+  };
+
+  return (
+    <>
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
@@ -49,36 +72,41 @@ export function AddStickerModal({ file, onDismiss, onAdd }: AddStickerModalProps
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
-        {previewUrl && (
-          <div className={styles.previewContainer}>
-            {file?.type.startsWith('video/') ? (
-              <video src={previewUrl} className={styles.previewMedia} autoPlay loop muted playsInline />
-            ) : (
-              <img src={previewUrl} alt={t`Sticker preview`} className={styles.previewMedia} />
-            )}
-          </div>
-        )}
-        <IonItem>
-          <IonLabel position="stacked">
-            <Trans>Emoji</Trans> *
-          </IonLabel>
-          <IonInput
-            ref={emojiRef}
-            placeholder="e.g. 😊"
-            maxlength={32}
+        <div className={styles.previewContainer}>
+          {file.type.startsWith('video/') ? (
+            <video src={previewUrl} className={styles.previewMedia} autoPlay loop muted playsInline />
+          ) : (
+            <img src={previewUrl} alt={t`Sticker preview`} className={styles.previewMedia} />
+          )}
+        </div>
+        <div className={styles.formFields}>
+          <EmojiInput
+            value={emoji}
+            onChange={(value) => {
+              setEmoji(value);
+              if (value.trim()) {
+                setShowEmojiError(false);
+              }
+            }}
+            label={t`Emoji`}
+            placeholder={t`e.g. 😊`}
+            required
+            invalid={showEmojiError}
+            errorText={t`Please choose at least one emoji`}
+            maxEmojiCount={4}
           />
-        </IonItem>
-        <IonItem>
-          <IonLabel position="stacked">
-            <Trans>Name</Trans>
-          </IonLabel>
           <IonInput
-            ref={nameRef}
+            className={styles.nameInput}
+            value={name}
+            label={t`Name`}
+            labelPlacement="stacked"
             placeholder={t`Optional`}
             maxlength={255}
+            counter
+            onIonInput={(event) => setName(event.detail.value ?? '')}
           />
-        </IonItem>
+        </div>
       </IonContent>
-    </IonModal>
+    </>
   );
 }

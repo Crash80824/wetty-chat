@@ -52,7 +52,7 @@ function renderInnerBubble(
     );
   }
   // RegularChatBubbleProps includes swipeDirection/onLongPress that ChatBubbleBase doesn't accept
-  const { swipeDirection: _, onLongPress: _lp, ...baseProps } = props;
+  const baseProps: ChatBubbleBaseProps = props;
   return <ChatBubbleBase {...baseProps} bubbleRef={bubbleRef} />;
 }
 

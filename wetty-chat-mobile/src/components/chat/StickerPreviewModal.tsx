@@ -19,32 +19,37 @@ interface StickerPreviewModalProps {
   onDismiss: () => void;
 }
 
+interface StickerPreviewModalContentProps {
+  stickerId: string;
+  isDesktop: boolean;
+  onDismiss: () => void;
+}
+
 export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModalProps) {
   const isDesktop = useIsDesktop();
+  const isOpen = stickerId != null;
 
+  if (!isOpen) return null;
+
+  return <StickerPreviewModalContent key={stickerId} stickerId={stickerId} isDesktop={isDesktop} onDismiss={onDismiss} />;
+}
+
+function StickerPreviewModalContent({ stickerId, isDesktop, onDismiss }: StickerPreviewModalContentProps) {
   const [detail, setDetail] = useState<{ id: string; data: StickerDetailResponse } | null>(null);
   const [packDetail, setPackDetail] = useState<{ id: string; data: StickerPackDetailResponse } | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
 
-  const isOpen = stickerId != null;
-  const loading = isOpen && (detail?.id !== stickerId || !packDetail);
+  const loading = detail?.id !== stickerId || !packDetail;
   const stickerData = detail?.id === stickerId ? detail.data : null;
   const pack = packDetail?.data ?? null;
 
   const heroSticker = selectedStickerId
-    ? pack?.stickers.find((s) => s.id === selectedStickerId) ?? stickerData
+    ? pack?.stickers.find((sticker) => sticker.id === selectedStickerId) ?? stickerData
     : stickerData;
   const heroUrl = heroSticker?.media.url ?? null;
 
-  // Fetch sticker detail → then pack detail
   useEffect(() => {
-    if (!stickerId) return;
-
-    setPackDetail(null);
-    setIsSubscribed(false);
-    setSelectedStickerId(null);
-
     let cancelled = false;
 
     getStickerDetail(stickerId)
@@ -71,11 +76,6 @@ export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModa
       cancelled = true;
     };
   }, [stickerId]);
-
-  function handleDismiss() {
-    setSelectedStickerId(null);
-    onDismiss();
-  }
 
   async function handleSubscriptionToggle() {
     if (!pack) return;
@@ -107,7 +107,6 @@ export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModa
 
     return (
       <>
-        {/* Hero */}
         <div className={styles.heroSection}>
           {heroUrl && (
             <img src={heroUrl} alt={t`Sticker preview`} className={styles.heroMedia} />
@@ -115,7 +114,6 @@ export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModa
           {heroSticker && <span className={styles.heroEmoji}>{heroSticker.emoji}</span>}
         </div>
 
-        {/* Pack header */}
         <div className={styles.packHeader}>
           <span className={styles.packName}>{packName}</span>
           <span className={styles.packCount}>
@@ -123,7 +121,6 @@ export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModa
           </span>
         </div>
 
-        {/* Sticker grid */}
         <div className={styles.grid}>
           {stickers.map((sticker) => (
             <button
@@ -162,7 +159,7 @@ export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModa
 
   if (isDesktop) {
     return (
-      <IonModal isOpen={isOpen} onDidDismiss={handleDismiss}>
+      <IonModal isOpen onDidDismiss={onDismiss}>
         <IonContent>
           {renderContent()}
         </IonContent>
@@ -171,14 +168,12 @@ export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModa
     );
   }
 
-  if (!isOpen) return null;
-
   return (
     <>
-      <div className={styles.backdrop} onClick={handleDismiss} />
+      <div className={styles.backdrop} onClick={onDismiss} />
       <div className={styles.sheet}>
         <div className={styles.sheetHeader}>
-          <button type="button" className={styles.sheetCloseBtn} onClick={handleDismiss} aria-label={t`Close`}>
+          <button type="button" className={styles.sheetCloseBtn} onClick={onDismiss} aria-label={t`Close`}>
             <IonIcon icon={close} />
           </button>
           <span className={styles.sheetTitle}>{packName}</span>

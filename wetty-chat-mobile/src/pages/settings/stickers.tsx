@@ -53,7 +53,11 @@ export function StickerSettingsCore({ backAction, onOpenPack }: StickerSettingsC
   }, [presentToast]);
 
   useEffect(() => {
-    void loadPacks();
+    const run = async () => {
+      await loadPacks();
+    };
+
+    void run();
   }, [loadPacks]);
 
   const handleOpenPack = (packId: string) => {

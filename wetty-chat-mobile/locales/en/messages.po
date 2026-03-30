@@ -35,6 +35,10 @@ msgid "[Invite]"
 msgstr "[Invite]"
 
 #: src/components/chat/messagePreview.ts
+msgid "[Sticker]"
+msgstr "[Sticker]"
+
+#: src/components/chat/messagePreview.ts
 #: src/components/chat/messagePreview.ts
 msgid "[Video]"
 msgstr "[Video]"
@@ -78,6 +82,7 @@ msgstr "A new version of the app is available!"
 msgid "About"
 msgstr "About"
 
+#: src/components/chat/compose/AddStickerModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Add"
 msgstr "Add"
@@ -86,6 +91,19 @@ msgstr "Add"
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Add Member"
 msgstr "Add Member"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Add sticker"
+msgstr "Add sticker"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Add Sticker"
+msgstr "Add Sticker"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Add to Favorites"
+msgstr "Add to Favorites"
 
 #: src/pages/settings/general.tsx
 msgid "Alex"
@@ -148,6 +166,8 @@ msgstr "Back to chats"
 msgid "Blocked"
 msgstr "Blocked"
 
+#: src/components/chat/compose/AddStickerModal.tsx
+#: src/components/chat/compose/StickerPicker.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
@@ -157,6 +177,9 @@ msgstr "Blocked"
 #: src/pages/chat-thread/chat-settings.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/manage-invites.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/stickers.tsx
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -190,6 +213,10 @@ msgstr "Choose a destination group"
 msgid "Choose a new image to replace the current avatar."
 msgstr "Choose a new image to replace the current avatar."
 
+#: src/components/shared/EmojiInput.tsx
+msgid "Choose Emoji"
+msgstr "Choose Emoji"
+
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Choose the member group first"
 msgstr "Choose the member group first"
@@ -203,10 +230,15 @@ msgstr "Clipboard is not available on this device"
 #: src/components/chat/ReactionDetailsModal.tsx
 #: src/components/chat/settings/ShareInviteGroupSelectorModal.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
+#: src/components/chat/StickerPreviewModal.tsx
 #: src/components/chat/UserProfileModal.tsx
 #: src/components/invites/InviteMessageModal.tsx
 msgid "Close"
 msgstr "Close"
+
+#: src/components/shared/EmojiInput.tsx
+msgid "Close emoji picker"
+msgstr "Close emoji picker"
 
 #: src/components/chat/ImageViewer.tsx
 msgid "Close viewer"
@@ -246,6 +278,11 @@ msgstr "Could not load invite"
 msgid "Could not validate invite code"
 msgstr "Could not validate invite code"
 
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Create"
+msgstr "Create"
+
 #: src/layouts/DesktopSplitLayout.tsx
 #: src/pages/chats.tsx
 msgid "Create Chat"
@@ -254,6 +291,14 @@ msgstr "Create Chat"
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Create Invite"
 msgstr "Create Invite"
+
+#: src/pages/settings/stickers.tsx
+msgid "Create New Pack"
+msgstr "Create New Pack"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Create new sticker pack"
+msgstr "Create new sticker pack"
 
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
@@ -304,6 +349,10 @@ msgstr "Download"
 msgid "Download image"
 msgstr "Download image"
 
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "e.g. 😊"
+msgstr "e.g. 😊"
+
 #: src/components/chat/ChatVirtualScroll.tsx
 msgid "Earlier messages"
 msgstr "Earlier messages"
@@ -317,8 +366,13 @@ msgid "Edit message"
 msgstr "Edit message"
 
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "Edited"
 msgstr "Edited"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Emoji"
+msgstr "Emoji"
 
 #: src/pages/join-chat.tsx
 msgid "Enter an invite code"
@@ -362,6 +416,11 @@ msgstr "Expires"
 msgid "Failed to add member"
 msgstr "Failed to add member"
 
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to add sticker"
+msgstr "Failed to add sticker"
+
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Failed to copy invite code"
@@ -370,6 +429,11 @@ msgstr "Failed to copy invite code"
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Failed to create invite"
 msgstr "Failed to create invite"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Failed to create sticker pack"
+msgstr "Failed to create sticker pack"
 
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to delete message"
@@ -421,6 +485,18 @@ msgstr "Failed to load more"
 msgid "Failed to load newer messages"
 msgstr "Failed to load newer messages"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to load sticker pack"
+msgstr "Failed to load sticker pack"
+
+#: src/pages/settings/stickers.tsx
+msgid "Failed to load sticker packs"
+msgstr "Failed to load sticker packs"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Failed to load stickers"
+msgstr "Failed to load stickers"
+
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Failed to mute"
 msgstr "Failed to mute"
@@ -433,6 +509,10 @@ msgstr "Failed to refresh chats"
 msgid "Failed to remove member"
 msgstr "Failed to remove member"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to remove sticker"
+msgstr "Failed to remove sticker"
+
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Failed to revoke invite"
 msgstr "Failed to revoke invite"
@@ -441,6 +521,7 @@ msgstr "Failed to revoke invite"
 msgid "Failed to save settings"
 msgstr "Failed to save settings"
 
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to send"
@@ -469,6 +550,14 @@ msgstr "Failed to turn on push notifications"
 msgid "Failed to unmute"
 msgstr "Failed to unmute"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to unsubscribe"
+msgstr "Failed to unsubscribe"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Failed to update favorites"
+msgstr "Failed to update favorites"
+
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Failed to update role"
 msgstr "Failed to update role"
@@ -476,6 +565,10 @@ msgstr "Failed to update role"
 #: src/pages/chat-thread/chat-settings.tsx
 msgid "Failed to upload avatar"
 msgstr "Failed to upload avatar"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Favorites"
+msgstr "Favorites"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Forever"
@@ -612,7 +705,9 @@ msgid "Loading invite…"
 msgstr "Loading invite…"
 
 #: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/StickerPreviewModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 msgid "Loading..."
 msgstr "Loading..."
 
@@ -688,6 +783,14 @@ msgstr "Mute notifications"
 #~ msgid "Muted until {0}"
 #~ msgstr "Muted until {0}"
 
+#: src/pages/settings/stickers.tsx
+msgid "My Packs"
+msgstr "My Packs"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Name"
+msgstr "Name"
+
 #: src/components/chat/settings/shareInviteHelpers.ts
 #: src/components/chat/settings/shareInviteHelpers.ts
 #: src/pages/chat-thread/manage-invites.tsx
@@ -697,6 +800,11 @@ msgstr "Never"
 #: src/components/chat/ChatList.tsx
 msgid "New message"
 msgstr "New message"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "New Sticker Pack"
+msgstr "New Sticker Pack"
 
 #: src/components/chat/ChatVirtualScroll.tsx
 msgid "Newer messages"
@@ -747,6 +855,14 @@ msgstr "No messages yet"
 msgid "No service worker registered"
 msgstr "No service worker registered"
 
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "No stickers"
+msgstr "No stickers"
+
+#: src/pages/settings/stickers.tsx
+msgid "No subscribed packs"
+msgstr "No subscribed packs"
+
 #: src/components/invites/InvitePreviewCard.tsx
 msgid "Not now"
 msgstr "Not now"
@@ -780,9 +896,26 @@ msgstr "Open chat"
 msgid "Open chat actions"
 msgstr "Open chat actions"
 
+#: src/components/shared/EmojiInput.tsx
+msgid "Open emoji picker"
+msgstr "Open emoji picker"
+
 #: src/components/chat/messages/InviteMessageCard.tsx
 msgid "Open this invite to view the group and join."
 msgstr "Open this invite to view the group and join."
+
+#: src/components/chat/compose/AddStickerModal.tsx
+msgid "Optional"
+msgstr "Optional"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Pack"
+msgstr "Pack"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Pack name"
+msgstr "Pack name"
 
 #: src/pages/join-chat.tsx
 msgid "Paste code"
@@ -795,6 +928,11 @@ msgstr "Permission"
 #: src/pages/chat-thread/chat-settings.tsx
 msgid "Please choose an image file"
 msgstr "Please choose an image file"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+#: src/components/shared/EmojiInput.tsx
+msgid "Please choose at least one emoji"
+msgstr "Please choose at least one emoji"
 
 #: src/components/invites/InvitePreviewCard.tsx
 msgid "Please try again in a moment."
@@ -884,6 +1022,7 @@ msgid "Release to save"
 msgstr "Release to save"
 
 #: src/pages/chat-thread/chat-members.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 msgid "Remove"
 msgstr "Remove"
 
@@ -896,6 +1035,10 @@ msgstr "Remove {0}"
 msgid "Remove {displayName} from this group?"
 msgstr "Remove {displayName} from this group?"
 
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Remove from Favorites"
+msgstr "Remove from Favorites"
+
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Remove from Group"
 msgstr "Remove from Group"
@@ -904,15 +1047,30 @@ msgstr "Remove from Group"
 msgid "Remove Member"
 msgstr "Remove Member"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Remove Sticker"
+msgstr "Remove Sticker"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Remove this pack from your collection?"
+msgstr "Remove this pack from your collection?"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Remove this sticker from the pack?"
+msgstr "Remove this sticker from the pack?"
+
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "replies"
 msgstr "replies"
 
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "reply"
 msgstr "reply"
 
 #: src/components/chat/messages/ChatBubbleBase.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Reply"
 msgstr "Reply"
@@ -950,6 +1108,10 @@ msgstr "Save Settings"
 #: src/pages/chat-thread/ChatAdminSettings.tsx
 msgid "Saving..."
 msgstr "Saving..."
+
+#: src/components/shared/EmojiInput.tsx
+msgid "Search emoji"
+msgstr "Search emoji"
 
 #: src/components/group-selector/GroupSelector.tsx
 msgid "Search groups"
@@ -1018,12 +1180,44 @@ msgid "Status"
 msgstr "Status"
 
 #: src/components/chat/compose/ComposeInput.tsx
+#: src/components/chat/messages/StickerBubble.tsx
 msgid "Sticker"
 msgstr "Sticker"
+
+#: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Sticker added"
+msgstr "Sticker added"
+
+#: src/components/chat/compose/StickerPicker.tsx
+msgid "Sticker packs"
+msgstr "Sticker packs"
+
+#: src/components/chat/compose/AddStickerModal.tsx
+#: src/components/chat/StickerPreviewModal.tsx
+msgid "Sticker preview"
+msgstr "Sticker preview"
+
+#: src/components/chat/StickerPreviewModal.tsx
+msgid "stickers"
+msgstr "stickers"
+
+#: src/pages/settings.tsx
+#: src/pages/settings/stickers.tsx
+msgid "Stickers"
+msgstr "Stickers"
+
+#: src/components/chat/StickerPreviewModal.tsx
+msgid "Subscribe"
+msgstr "Subscribe"
 
 #: src/pages/settings.tsx
 msgid "Subscribed"
 msgstr "Subscribed"
+
+#: src/pages/settings/stickers.tsx
+msgid "Subscribed Packs"
+msgstr "Subscribed Packs"
 
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Targeted"
@@ -1077,6 +1271,13 @@ msgstr "Turn On Push Notifications"
 #: src/components/chat/ChatList.tsx
 msgid "Unread"
 msgstr "Unread"
+
+#: src/components/chat/StickerPreviewModal.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Unsubscribe"
+msgstr "Unsubscribe"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "until"

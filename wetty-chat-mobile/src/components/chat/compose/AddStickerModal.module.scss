@@ -4,6 +4,17 @@
   padding: 16px 0 24px;
 }
 
+.formFields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 8px;
+}
+
+.nameInput {
+  width: 100%;
+}
+
 .previewMedia {
   width: 160px;
   height: 160px;

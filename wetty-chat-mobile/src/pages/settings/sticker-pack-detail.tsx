@@ -55,7 +55,11 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
   }, [packId, presentToast]);
 
   useEffect(() => {
-    void loadPack();
+    const run = async () => {
+      await loadPack();
+    };
+
+    void run();
   }, [loadPack]);
 
   if (!pack) {
