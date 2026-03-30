@@ -9,6 +9,31 @@ use prometheus::{
 use std::sync::Arc;
 use std::time::Instant;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ActivityTodaySnapshot {
+    pub(crate) active_users: i64,
+    pub(crate) new_users: i64,
+    pub(crate) active_clients: i64,
+    pub(crate) new_clients: i64,
+    pub(crate) client_rebinds: i64,
+    pub(crate) stale_clients_purged: i64,
+    pub(crate) legacy_subscriptions_purged: i64,
+}
+
+impl ActivityTodaySnapshot {
+    pub(crate) const fn zero() -> Self {
+        Self {
+            active_users: 0,
+            new_users: 0,
+            active_clients: 0,
+            new_clients: 0,
+            client_rebinds: 0,
+            stale_clients_purged: 0,
+            legacy_subscriptions_purged: 0,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct Metrics {
     registry: Registry,
@@ -481,25 +506,18 @@ impl Metrics {
             .inc();
     }
 
-    pub(crate) fn set_activity_today(
-        &self,
-        active_users: i64,
-        new_users: i64,
-        active_clients: i64,
-        new_clients: i64,
-        client_rebinds: i64,
-        stale_clients_purged: i64,
-        legacy_subscriptions_purged: i64,
-    ) {
-        self.activity_today_active_users.set(active_users);
-        self.activity_today_new_users.set(new_users);
-        self.activity_today_active_clients.set(active_clients);
-        self.activity_today_new_clients.set(new_clients);
-        self.activity_today_client_rebinds.set(client_rebinds);
+    pub(crate) fn set_activity_today(&self, snapshot: ActivityTodaySnapshot) {
+        self.activity_today_active_users.set(snapshot.active_users);
+        self.activity_today_new_users.set(snapshot.new_users);
+        self.activity_today_active_clients
+            .set(snapshot.active_clients);
+        self.activity_today_new_clients.set(snapshot.new_clients);
+        self.activity_today_client_rebinds
+            .set(snapshot.client_rebinds);
         self.activity_today_stale_clients_purged
-            .set(stale_clients_purged);
+            .set(snapshot.stale_clients_purged);
         self.activity_today_legacy_subscriptions_purged
-            .set(legacy_subscriptions_purged);
+            .set(snapshot.legacy_subscriptions_purged);
     }
 }
 
@@ -589,7 +607,15 @@ mod tests {
         metrics.record_client_rebind();
         metrics.record_client_tracking_purge("stale_clients", 2);
         metrics.record_activity_daily_rollup_update("success");
-        metrics.set_activity_today(3, 1, 4, 2, 1, 2, 0);
+        metrics.set_activity_today(ActivityTodaySnapshot {
+            active_users: 3,
+            new_users: 1,
+            active_clients: 4,
+            new_clients: 2,
+            client_rebinds: 1,
+            stale_clients_purged: 2,
+            legacy_subscriptions_purged: 0,
+        });
         let app = Router::new()
             .route("/metrics", get(metrics_handler))
             .with_state(metrics);
@@ -715,7 +741,15 @@ mod tests {
         metrics.record_client_rebind();
         metrics.record_client_tracking_purge("legacy_subscriptions", 3);
         metrics.record_activity_daily_rollup_update("success");
-        metrics.set_activity_today(5, 2, 6, 3, 1, 0, 0);
+        metrics.set_activity_today(ActivityTodaySnapshot {
+            active_users: 5,
+            new_users: 2,
+            active_clients: 6,
+            new_clients: 3,
+            client_rebinds: 1,
+            stale_clients_purged: 0,
+            legacy_subscriptions_purged: 0,
+        });
 
         let rendered = metrics.render().expect("metrics should render");
         assert!(rendered.contains("messages_total{chat_id=\"123\"} 1"));

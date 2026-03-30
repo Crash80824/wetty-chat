@@ -14,7 +14,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use tracing::{error, info, warn};
 
-use crate::metrics::Metrics;
+use crate::metrics::{ActivityTodaySnapshot, Metrics};
 use crate::models::{
     ActivityDailyMetric, ClientRecord, NewActivityDailyMetric, NewClientRecord, NewUserExtra,
     UserExtra,
@@ -54,6 +54,18 @@ impl DailyMetricDelta {
             && self.client_rebinds == 0
             && self.stale_clients_purged == 0
             && self.legacy_subscriptions_purged == 0
+    }
+
+    fn as_activity_today_snapshot(self) -> ActivityTodaySnapshot {
+        ActivityTodaySnapshot {
+            active_users: self.active_users,
+            new_users: self.new_users,
+            active_clients: self.active_clients,
+            new_clients: self.new_clients,
+            client_rebinds: self.client_rebinds,
+            stale_clients_purged: self.stale_clients_purged,
+            legacy_subscriptions_purged: self.legacy_subscriptions_purged,
+        }
     }
 }
 
@@ -327,17 +339,18 @@ impl ClientTrackingService {
             .map_err(|e| format!("failed to load today's activity metrics: {:?}", e))?;
 
         if let Some(metrics) = today_metrics {
-            self.metrics.set_activity_today(
-                metrics.active_users,
-                metrics.new_users,
-                metrics.active_clients,
-                metrics.new_clients,
-                metrics.client_rebinds,
-                metrics.stale_clients_purged,
-                metrics.legacy_subscriptions_purged,
-            );
+            self.metrics.set_activity_today(ActivityTodaySnapshot {
+                active_users: metrics.active_users,
+                new_users: metrics.new_users,
+                active_clients: metrics.active_clients,
+                new_clients: metrics.new_clients,
+                client_rebinds: metrics.client_rebinds,
+                stale_clients_purged: metrics.stale_clients_purged,
+                legacy_subscriptions_purged: metrics.legacy_subscriptions_purged,
+            });
         } else {
-            self.metrics.set_activity_today(0, 0, 0, 0, 0, 0, 0);
+            self.metrics
+                .set_activity_today(ActivityTodaySnapshot::zero());
         }
 
         Ok(())
@@ -395,13 +408,17 @@ impl ClientTrackingService {
             .first::<ActivityDailyMetric>(conn)?;
 
         self.metrics.set_activity_today(
-            today_metrics.active_users,
-            today_metrics.new_users,
-            today_metrics.active_clients,
-            today_metrics.new_clients,
-            today_metrics.client_rebinds,
-            today_metrics.stale_clients_purged,
-            today_metrics.legacy_subscriptions_purged,
+            DailyMetricDelta {
+                day: today_metrics.day,
+                active_users: today_metrics.active_users,
+                new_users: today_metrics.new_users,
+                active_clients: today_metrics.active_clients,
+                new_clients: today_metrics.new_clients,
+                client_rebinds: today_metrics.client_rebinds,
+                stale_clients_purged: today_metrics.stale_clients_purged,
+                legacy_subscriptions_purged: today_metrics.legacy_subscriptions_purged,
+            }
+            .as_activity_today_snapshot(),
         );
         self.metrics.record_activity_daily_rollup_update("success");
         if delta.client_rebinds > 0 {

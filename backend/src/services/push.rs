@@ -402,6 +402,33 @@ fn maybe_panic_for_test(job: &PushJob) {
 static TEST_PANIC_MESSAGE_ID: std::sync::atomic::AtomicI64 =
     std::sync::atomic::AtomicI64::new(i64::MIN);
 
+pub(crate) async fn supervise_worker<F, Fut>(
+    worker_name: &str,
+    restart_delay: Duration,
+    mut worker: F,
+) where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    loop {
+        let worker_result = std::panic::AssertUnwindSafe(worker()).catch_unwind().await;
+
+        match worker_result {
+            Ok(()) => return,
+            Err(payload) => {
+                let panic_message = panic_payload_message(payload.as_ref());
+                error!(
+                    "{} panicked; restarting in {}s: {}",
+                    worker_name,
+                    restart_delay.as_secs_f32(),
+                    panic_message
+                );
+                tokio::time::sleep(restart_delay).await;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -464,32 +491,5 @@ mod tests {
 
         assert_eq!(attempt, 2);
         assert_eq!(attempts.load(Ordering::SeqCst), 2);
-    }
-}
-
-pub(crate) async fn supervise_worker<F, Fut>(
-    worker_name: &str,
-    restart_delay: Duration,
-    mut worker: F,
-) where
-    F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = ()>,
-{
-    loop {
-        let worker_result = std::panic::AssertUnwindSafe(worker()).catch_unwind().await;
-
-        match worker_result {
-            Ok(()) => return,
-            Err(payload) => {
-                let panic_message = panic_payload_message(payload.as_ref());
-                error!(
-                    "{} panicked; restarting in {}s: {}",
-                    worker_name,
-                    restart_delay.as_secs_f32(),
-                    panic_message
-                );
-                tokio::time::sleep(restart_delay).await;
-            }
-        }
     }
 }

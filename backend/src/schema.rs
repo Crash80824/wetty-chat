@@ -1,3 +1,4 @@
+#[allow(clippy::module_inception)]
 pub mod discuz;
 pub mod discuz_manual;
 pub mod primary;

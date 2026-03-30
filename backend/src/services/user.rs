@@ -37,6 +37,17 @@ struct MemberUidRow {
     uid: i32,
 }
 
+#[derive(Queryable)]
+struct DiscuzUserProfileRow {
+    uid: i32,
+    username: String,
+    gender: Option<i16>,
+    group_id: i32,
+    group_name: Option<String>,
+    chat_group_color: Option<String>,
+    chat_group_color_dark: Option<String>,
+}
+
 pub fn parse_user_search_query(
     raw_query: Option<&str>,
     mode: UserSearchMode,
@@ -145,15 +156,7 @@ pub fn lookup_user_profiles(
         return Ok(HashMap::new());
     }
 
-    let rows: Vec<(
-        i32,
-        String,
-        Option<i16>,
-        i32,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    )> = cm_dsl::common_member
+    let rows = cm_dsl::common_member
         .left_join(cmp_dsl::common_member_profile.on(cm_dsl::uid.eq(cmp_dsl::uid)))
         .left_join(cug_dsl::common_usergroup.on(cm_dsl::groupid.eq(cug_dsl::groupid)))
         .left_join(uge_dsl::usergroup_extra.on(cm_dsl::groupid.eq(uge_dsl::groupid)))
@@ -167,35 +170,25 @@ pub fn lookup_user_profiles(
             uge_dsl::chat_group_color.nullable(),
             uge_dsl::chat_group_color_dark.nullable(),
         ))
-        .load(conn)?;
+        .load::<DiscuzUserProfileRow>(conn)?;
 
     Ok(rows
         .into_iter()
-        .map(
-            |(
-                uid,
-                username,
-                gender,
-                group_id,
-                group_name,
-                chat_group_color,
-                chat_group_color_dark,
-            )| {
-                (
-                    uid,
-                    UserProfile {
-                        username: Some(normalize_discuz_username(&username)),
-                        gender: gender.unwrap_or(0),
-                        user_group: Some(UserGroupInfo {
-                            group_id,
-                            name: group_name,
-                            chat_group_color,
-                            chat_group_color_dark,
-                        }),
-                    },
-                )
-            },
-        )
+        .map(|row| {
+            (
+                row.uid,
+                UserProfile {
+                    username: Some(normalize_discuz_username(&row.username)),
+                    gender: row.gender.unwrap_or(0),
+                    user_group: Some(UserGroupInfo {
+                        group_id: row.group_id,
+                        name: row.group_name,
+                        chat_group_color: row.chat_group_color,
+                        chat_group_color_dark: row.chat_group_color_dark,
+                    }),
+                },
+            )
+        })
         .collect())
 }
 
