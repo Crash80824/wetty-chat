@@ -44,6 +44,10 @@ export function getMessagePreviewText(preview: PreviewMessage): string {
     return t`[Invite]`;
   }
 
+  if (messageType === 'sticker') {
+    return t`[Sticker]`;
+  }
+
   if (messageType === 'audio') {
     return t`[Voice message]`;
   }

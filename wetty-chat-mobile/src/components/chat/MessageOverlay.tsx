@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { IonIcon } from '@ionic/react';
 import type { Attachment } from '@/api/messages';
 import { ChatBubbleBase } from './messages/ChatBubbleBase';
+import { StickerBubble } from './messages/StickerBubble';
 import type { PreviewMessage } from './messagePreview';
 import styles from './MessageOverlay.module.scss';
 
@@ -15,10 +16,8 @@ export interface MessageOverlayAction {
   handler: () => void;
 }
 
-interface MessageOverlayProps {
-  messageType?: 'text' | 'audio' | 'system' | 'invite' | 'sticker';
+interface MessageOverlayBaseProps {
   senderName: string;
-  message: string;
   isSent: boolean;
   showName?: boolean;
   replyTo?: {
@@ -28,7 +27,6 @@ interface MessageOverlayProps {
   timestamp?: string;
   edited?: boolean;
   isConfirmed?: boolean;
-  attachments?: Attachment[];
   sourceRect: DOMRect;
   actions: MessageOverlayAction[];
   reactions?: {
@@ -38,22 +36,37 @@ interface MessageOverlayProps {
   onClose: () => void;
 }
 
-export function MessageOverlay({
-  messageType = 'text',
-  senderName,
-  message,
-  isSent,
-  showName = true,
-  replyTo,
-  timestamp,
-  edited,
-  isConfirmed,
-  attachments,
-  sourceRect,
-  actions,
-  reactions,
-  onClose,
-}: MessageOverlayProps) {
+interface StickerOverlayProps extends MessageOverlayBaseProps {
+  messageType: 'sticker';
+  stickerUrl: string;
+  message?: never;
+  attachments?: never;
+}
+
+interface RegularOverlayProps extends MessageOverlayBaseProps {
+  messageType?: 'text' | 'audio';
+  message: string;
+  attachments?: Attachment[];
+  stickerUrl?: never;
+}
+
+export type MessageOverlayProps = StickerOverlayProps | RegularOverlayProps;
+
+export function MessageOverlay(props: MessageOverlayProps) {
+  const {
+    senderName,
+    isSent,
+    showName = true,
+    replyTo,
+    timestamp,
+    edited,
+    isConfirmed,
+    sourceRect,
+    actions,
+    reactions,
+    onClose,
+  } = props;
+  const isSticker = props.messageType === 'sticker';
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Compute position after first render so we know the full content dimensions
@@ -125,6 +138,50 @@ export function MessageOverlay({
     }
   }
 
+  const bubbleCloneProps = {
+    'data-bubble-clone': 'true' as const,
+    className: isSticker ? undefined : styles.bubbleClone,
+    style: { width: sourceRect.width },
+  };
+
+  let bubbleClone;
+  if (props.messageType === 'sticker') {
+    bubbleClone = (
+      <StickerBubble
+        stickerUrl={props.stickerUrl}
+        senderName={senderName}
+        isSent={isSent}
+        showAvatar={false}
+        replyTo={replyTo}
+        timestamp={timestamp}
+        edited={edited}
+        isConfirmed={isConfirmed}
+        layout="bubble-only"
+        interactionMode="read-only"
+        bubbleProps={bubbleCloneProps}
+      />
+    );
+  } else {
+    bubbleClone = (
+      <ChatBubbleBase
+        messageType={props.messageType}
+        senderName={senderName}
+        message={props.message}
+        isSent={isSent}
+        showName={showName}
+        showAvatar={false}
+        replyTo={replyTo}
+        timestamp={timestamp}
+        edited={edited}
+        isConfirmed={isConfirmed}
+        attachments={props.attachments}
+        layout="bubble-only"
+        interactionMode="read-only"
+        bubbleProps={bubbleCloneProps}
+      />
+    );
+  }
+
   const overlay = (
     <div className={styles.overlay} onClick={handleBackdropClick}>
       <div
@@ -132,8 +189,8 @@ export function MessageOverlay({
         className={`${styles.content} ${isSent ? styles.contentSent : ''} ${styles.contentVisible}`}
         style={{ top: sourceRect.top, left: sourceRect.left, visibility: 'hidden' }}
       >
-        {/* Reaction bar */}
-        {reactions && (
+        {/* Reaction bar — hidden for stickers */}
+        {!isSticker && reactions && (
           <div className={styles.reactionBar}>
             {reactions.emojis.map((emoji) => (
               <button
@@ -152,26 +209,7 @@ export function MessageOverlay({
         )}
 
         {/* Bubble clone */}
-        <ChatBubbleBase
-          messageType={messageType}
-          senderName={senderName}
-          message={message}
-          isSent={isSent}
-          showName={showName}
-          showAvatar={false}
-          replyTo={replyTo}
-          timestamp={timestamp}
-          edited={edited}
-          isConfirmed={isConfirmed}
-          attachments={attachments}
-          layout="bubble-only"
-          interactionMode="read-only"
-          bubbleProps={{
-            'data-bubble-clone': 'true',
-            className: styles.bubbleClone,
-            style: { width: sourceRect.width },
-          }}
-        />
+        {bubbleClone}
 
         {/* Action list */}
         <div className={styles.actionList}>

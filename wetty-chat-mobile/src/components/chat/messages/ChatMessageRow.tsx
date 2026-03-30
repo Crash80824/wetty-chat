@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { t } from '@lingui/core/macro';
-import type { MessageResponse, Sender } from '@/api/messages';
+import { type MessageResponse, type Sender } from '@/api/messages';
 import { InviteMessageModal } from '@/components/invites/InviteMessageModal';
 import { ChatBubble } from './ChatBubble';
 import { InviteMessageCard } from './InviteMessageCard';
@@ -18,6 +18,7 @@ interface ChatMessageRowProps {
   onAvatarClick: (sender: Sender) => void;
   onThreadClick: (message: MessageResponse) => void;
   onReactionToggle: (message: MessageResponse, emoji: string, currentlyReacted: boolean) => void;
+  onStickerTap?: (stickerId: string) => void;
 }
 
 function isSystemMessage(message: MessageResponse): boolean {
@@ -26,6 +27,10 @@ function isSystemMessage(message: MessageResponse): boolean {
 
 function isInviteMessage(message: MessageResponse): boolean {
   return message.message_type === 'invite';
+}
+
+function isStickerMessage(message: MessageResponse): boolean {
+  return message.message_type === 'sticker';
 }
 
 export function ChatMessageRow({
@@ -38,6 +43,7 @@ export function ChatMessageRow({
   onAvatarClick,
   onThreadClick,
   onReactionToggle,
+  onStickerTap,
 }: ChatMessageRowProps) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
 
@@ -70,37 +76,51 @@ export function ChatMessageRow({
     );
   }
 
+  const sharedBubbleProps = {
+    senderName: msg.sender.name ?? `User ${msg.sender.uid}`,
+    isSent: msg.sender.uid === currentUserId,
+    avatarUrl: msg.sender.avatar_url,
+    onReply: () => onReply(msg),
+    onReplyTap: replyToMessage && !replyToMessage.is_deleted ? () => onJumpToReply(replyToMessage.id) : undefined,
+    onLongPress: (rect: DOMRect) => onLongPress(msg, rect),
+    showAvatar: row.showAvatar,
+    timestamp: msg.created_at,
+    edited: msg.is_edited,
+    threadInfo: !threadId ? msg.thread_info : undefined,
+    onThreadClick: () => onThreadClick(msg),
+    onAvatarClick: () => onAvatarClick(msg.sender),
+    isConfirmed: !msg.id.startsWith('cg_'),
+    replyTo: replyToMessage
+      ? {
+          senderName: replyToMessage.sender.name ?? `User ${replyToMessage.sender.uid}`,
+          preview: replyToMessage,
+        }
+      : undefined,
+  } as const;
+
+  if (isStickerMessage(msg)) {
+    const stickerUrl = msg.sticker?.media.url ?? '';
+    return (
+      <ChatBubble
+        {...sharedBubbleProps}
+        messageType="sticker"
+        stickerUrl={stickerUrl}
+        onStickerTap={msg.sticker && onStickerTap ? () => onStickerTap(msg.sticker!.id) : undefined}
+      />
+    );
+  }
+
   return (
     <ChatBubble
-      messageType={msg.message_type}
-      senderName={msg.sender.name ?? `User ${msg.sender.uid}`}
+      {...sharedBubbleProps}
+      messageType={msg.message_type as 'text' | 'audio'}
       senderGender={msg.sender.gender}
       senderGroup={msg.sender.user_group}
       message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
-      isSent={msg.sender.uid === currentUserId}
-      avatarUrl={msg.sender.avatar_url}
-      onReply={() => onReply(msg)}
-      onReplyTap={replyToMessage && !replyToMessage.is_deleted ? () => onJumpToReply(replyToMessage.id) : undefined}
-      onLongPress={(rect) => onLongPress(msg, rect)}
       showName={row.showName}
-      showAvatar={row.showAvatar}
-      timestamp={msg.created_at}
-      edited={msg.is_edited}
-      threadInfo={!threadId ? msg.thread_info : undefined}
-      onThreadClick={() => onThreadClick(msg)}
-      onAvatarClick={() => onAvatarClick(msg.sender)}
       attachments={msg.attachments}
-      isConfirmed={!msg.id.startsWith('cg_')}
       reactions={msg.reactions}
       onReactionToggle={(emoji, currentlyReacted) => onReactionToggle(msg, emoji, currentlyReacted)}
-      replyTo={
-        replyToMessage
-          ? {
-              senderName: replyToMessage.sender.name ?? `User ${replyToMessage.sender.uid}`,
-              preview: replyToMessage,
-            }
-          : undefined
-      }
     />
   );
 }

@@ -25,7 +25,6 @@ import {
   informationCircleOutline,
   notificationsOffOutline,
   people,
-  starOutline,
   trashOutline,
 } from 'ionicons/icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -80,6 +79,7 @@ import { t } from '@lingui/core/macro';
 import { UserProfileModal } from '@/components/chat/UserProfileModal';
 import { MessageOverlay, type MessageOverlayAction } from '@/components/chat/MessageOverlay';
 import { ReactionDetailsModal } from '@/components/chat/ReactionDetailsModal';
+import { StickerPreviewModal } from '@/components/chat/StickerPreviewModal';
 import { getGroupInfo } from '@/api/group';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
@@ -179,7 +179,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         dispatch(setChatMeta({ chatId: chatId, meta }));
         dispatch(setChatMutedUntil({ chatId, mutedUntil: muted_until ?? null }));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [chatId, storedName, dispatch]);
   const messages = useSelector((state: RootState) => selectMessagesForChat(state, storeChatId));
   const messageLookup = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
@@ -220,6 +220,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const [replyingTo, setReplyingTo] = useState<MessageResponse | null>(null);
   const [profileSender, setProfileSender] = useState<Sender | null>(null);
   const [reactionDetail, setReactionDetail] = useState<{ messageId: string; emoji?: string } | null>(null);
+  const [stickerPreviewId, setStickerPreviewId] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<EditSession | null>(null);
   const [composeFocused, setComposeFocused] = useState(false);
   const [baselineViewportHeight, setBaselineViewportHeight] = useState<number>(
@@ -558,7 +559,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         optimistic = existing
           .map((r) => (r.emoji === emoji ? { ...r, count: r.count - 1, reacted_by_me: false } : r))
           .filter((r) => r.count > 0);
-        deleteReaction(chatId, msg.id, emoji).catch(() => {});
+        deleteReaction(chatId, msg.id, emoji).catch(() => { });
       } else {
         const found = existing.find((r) => r.emoji === emoji);
         if (found) {
@@ -566,7 +567,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         } else {
           optimistic = [...existing, { emoji, count: 1, reacted_by_me: true }];
         }
-        putReaction(chatId, msg.id, emoji).catch(() => {});
+        putReaction(chatId, msg.id, emoji).catch(() => { });
       }
       dispatch(reactionsUpdated({ chatId, messageId: msg.id, reactions: optimistic }));
     },
@@ -702,13 +703,14 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           reply_root_id: threadId ?? null,
           reply_to_message: replyingTo
             ? {
-                id: replyingTo.id,
-                message: replyingTo.message,
-                message_type: replyingTo.message_type,
-                sender: replyingTo.sender,
-                is_deleted: replyingTo.is_deleted,
-                attachments: replyingTo.attachments,
-              }
+              id: replyingTo.id,
+              message: replyingTo.message,
+              message_type: replyingTo.message_type,
+              sticker: replyingTo.sticker,
+              sender: replyingTo.sender,
+              is_deleted: replyingTo.is_deleted,
+              attachments: replyingTo.attachments,
+            }
             : undefined,
           client_generated_id: clientGeneratedId,
           sender: {
@@ -770,10 +772,10 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
               ...postResponse,
               reply_to_message: postResponse.reply_to_message
                 ? {
-                    ...optimistic.reply_to_message,
-                    ...postResponse.reply_to_message,
-                    attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
-                  }
+                  ...optimistic.reply_to_message,
+                  ...postResponse.reply_to_message,
+                  attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
+                }
                 : optimistic.reply_to_message,
             };
             dispatch(
@@ -803,6 +805,106 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         return;
       }
 
+      if (payload.kind === 'sticker') {
+        const clientGeneratedId = generateClientId();
+        const optimistic: MessageResponse = {
+          id: clientGeneratedId,
+          message: null,
+          message_type: 'sticker',
+          sticker: payload.sticker,
+          reply_root_id: threadId ?? null,
+          reply_to_message: replyingTo
+            ? {
+              id: replyingTo.id,
+              message: replyingTo.message,
+              message_type: replyingTo.message_type,
+              sticker: replyingTo.sticker,
+              sender: replyingTo.sender,
+              is_deleted: replyingTo.is_deleted,
+              attachments: replyingTo.attachments,
+            }
+            : undefined,
+          client_generated_id: clientGeneratedId,
+          sender: {
+            uid: currentUserId || 0,
+            gender: 0,
+            name: currentUserName,
+            avatar_url: currentUserAvatarUrl || undefined,
+          },
+          chat_id: chatId,
+          created_at: new Date().toISOString(),
+          is_edited: false,
+          is_deleted: false,
+          has_attachments: false,
+          attachments: [],
+          thread_info: undefined,
+        };
+        dispatch(
+          messageAdded({
+            chatId,
+            storeChatId,
+            message: optimistic,
+            origin: 'optimistic',
+            scope: threadId ? 'thread' : 'main',
+          }),
+        );
+        setReplyingTo(null);
+        if (!atBottom) {
+          pendingSendScrollKeyRef.current = `msg:${clientGeneratedId}`;
+        } else {
+          pendingSendScrollKeyRef.current = null;
+        }
+
+        const messagePayload = {
+          message_type: 'sticker' as const,
+          sticker_id: payload.sticker.id,
+          client_generated_id: clientGeneratedId,
+          reply_to_id: replyingTo?.id,
+          attachment_ids: [],
+        };
+
+        const sendPromise = threadId
+          ? sendThreadMessage(chatId, threadId, messagePayload)
+          : sendMessage(chatId, messagePayload);
+
+        sendPromise
+          .then((res) => {
+            const postResponse = res.data;
+            const confirmed: MessageResponse = {
+              ...postResponse,
+              sticker: postResponse.sticker ?? payload.sticker,
+              reply_to_message: postResponse.reply_to_message
+                ? {
+                  ...optimistic.reply_to_message,
+                  ...postResponse.reply_to_message,
+                  attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
+                }
+                : optimistic.reply_to_message,
+            };
+            dispatch(
+              messageConfirmed({
+                chatId,
+                storeChatId,
+                clientGeneratedId,
+                message: confirmed,
+                origin: 'api_confirm',
+                scope: threadId ? 'thread' : 'main',
+              }),
+            );
+          })
+          .catch((err: Error) => {
+            showToast(err.message || t`Failed to send`);
+            dispatch(
+              messagePatched({
+                chatId,
+                messageId: clientGeneratedId,
+                message: { ...optimistic, is_deleted: true },
+              }),
+            );
+          });
+        return;
+      }
+
       const { attachmentId, uploadedAttachment } = payload;
       const { attachments: optimisticAudioAttachments, revoke } = buildOptimisticUploadedAttachments([uploadedAttachment]);
       const clientGeneratedId = generateClientId();
@@ -813,13 +915,14 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         reply_root_id: threadId ?? null,
         reply_to_message: replyingTo
           ? {
-              id: replyingTo.id,
-              message: replyingTo.message,
-              message_type: replyingTo.message_type,
-              sender: replyingTo.sender,
-              is_deleted: replyingTo.is_deleted,
-              attachments: replyingTo.attachments,
-            }
+            id: replyingTo.id,
+            message: replyingTo.message,
+            message_type: replyingTo.message_type,
+            sticker: replyingTo.sticker,
+            sender: replyingTo.sender,
+            is_deleted: replyingTo.is_deleted,
+            attachments: replyingTo.attachments,
+          }
           : undefined,
         client_generated_id: clientGeneratedId,
         sender: {
@@ -871,10 +974,10 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
             ...postResponse,
             reply_to_message: postResponse.reply_to_message
               ? {
-                  ...optimistic.reply_to_message,
-                  ...postResponse.reply_to_message,
-                  attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
-                }
+                ...optimistic.reply_to_message,
+                ...postResponse.reply_to_message,
+                attachments: postResponse.reply_to_message.attachments ?? optimistic.reply_to_message?.attachments,
+              }
               : optimistic.reply_to_message,
           };
           dispatch(
@@ -936,10 +1039,11 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     if (!overlayMessage) return [];
     const msg = overlayMessage.message;
     const audioMessage = isAudioMessage(msg);
+    const stickerMessage = msg.message_type === 'sticker';
     const isOwn = msg.sender.uid === currentUserId;
     const actions: MessageOverlayAction[] = [];
 
-    if (!audioMessage) {
+    if (!audioMessage && !stickerMessage) {
       actions.push({
         key: 'copy',
         label: t`Copy`,
@@ -969,7 +1073,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         },
       });
     }
-    if (isOwn && !audioMessage) {
+    if (isOwn && !audioMessage && !stickerMessage) {
       actions.push({
         key: 'edit',
         label: t`Edit`,
@@ -1006,16 +1110,6 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         },
       });
     }
-    if (msg.message_type === 'sticker') {
-      actions.push({
-        key: 'favorite-sticker',
-        label: t`Add to Favorites`,
-        icon: starOutline,
-        handler: () => {
-          console.log('Add sticker to favorites (placeholder):', msg.id);
-        },
-      });
-    }
     if (msg.reactions?.length) {
       actions.push({
         key: 'reaction-details',
@@ -1025,6 +1119,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           setReactionDetail({ messageId: msg.id });
         },
       });
+    }
+    if (stickerMessage) {
+      return actions.filter((a) => a.key === 'reply' || a.key === 'delete');
     }
     return actions;
   }, [
@@ -1052,6 +1149,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           onAvatarClick={setProfileSender}
           onThreadClick={(message) => history.push(`/chats/chat/${chatId}/thread/${message.id}`)}
           onReactionToggle={handleReactionToggle}
+          onStickerTap={setStickerPreviewId}
         />
       );
     },
@@ -1125,12 +1223,14 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           replyTo={
             replyingTo
               ? {
-                  messageId: replyingTo.id,
-                  username: replyingTo.sender.name ?? `User ${replyingTo.sender.uid}`,
-                  text: replyingTo.message,
-                  attachments: replyingTo.attachments,
-                  isDeleted: replyingTo.is_deleted,
-                }
+                messageId: replyingTo.id,
+                username: replyingTo.sender.name ?? `User ${replyingTo.sender.uid}`,
+                messageType: replyingTo.message_type,
+                text: replyingTo.message,
+                attachments: replyingTo.attachments,
+                firstAttachmentKind: replyingTo.attachments?.[0]?.kind,
+                isDeleted: replyingTo.is_deleted,
+              }
               : undefined
           }
           onCancelReply={() => setReplyingTo(null)}
@@ -1146,42 +1246,59 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         initialEmoji={reactionDetail?.emoji}
         onDismiss={() => setReactionDetail(null)}
       />
-      {overlayMessage && (
-        <MessageOverlay
-          messageType={overlayMessage.message.message_type}
-          senderName={overlayMessage.message.sender.name ?? `User ${overlayMessage.message.sender.uid}`}
-          message={overlayMessage.message.is_deleted ? t`[Deleted]` : (overlayMessage.message.message ?? '')}
-          isSent={overlayMessage.message.sender.uid === currentUserId}
-          showName={true}
-          timestamp={overlayMessage.message.created_at}
-          edited={overlayMessage.message.is_edited}
-          isConfirmed={!overlayMessage.message.id.startsWith('cg_')}
-          attachments={overlayMessage.message.attachments}
-          replyTo={
-            overlayMessage.message.reply_to_message
-              ? {
-                  senderName:
-                    overlayMessage.message.reply_to_message.sender.name ??
-                    `User ${overlayMessage.message.reply_to_message.sender.uid}`,
-                  preview: overlayMessage.message.reply_to_message,
-                }
-              : undefined
-          }
-          sourceRect={overlayMessage.sourceRect}
-          actions={overlayActions}
-          reactions={{
+      <StickerPreviewModal
+        stickerId={stickerPreviewId}
+        onDismiss={() => setStickerPreviewId(null)}
+      />
+      {overlayMessage && (() => {
+        const msg = overlayMessage.message;
+        const sharedOverlayProps = {
+          senderName: msg.sender.name ?? `User ${msg.sender.uid}`,
+          isSent: msg.sender.uid === currentUserId,
+          showName: true,
+          timestamp: msg.created_at,
+          edited: msg.is_edited,
+          isConfirmed: !msg.id.startsWith('cg_'),
+          replyTo: msg.reply_to_message
+            ? {
+                senderName: msg.reply_to_message.sender.name ?? `User ${msg.reply_to_message.sender.uid}`,
+                preview: msg.reply_to_message,
+              }
+            : undefined,
+          sourceRect: overlayMessage.sourceRect,
+          actions: overlayActions,
+          reactions: {
             emojis: QUICK_REACTION_EMOJIS,
-            onReact: (emoji) => {
+            onReact: (emoji: string) => {
               handleReactionToggle(
-                overlayMessage.message,
+                msg,
                 emoji,
-                !!overlayMessage.message.reactions?.some((r) => r.emoji === emoji && r.reacted_by_me),
+                !!msg.reactions?.some((r) => r.emoji === emoji && r.reacted_by_me),
               );
             },
-          }}
-          onClose={() => setOverlayMessage(null)}
-        />
-      )}
+          },
+          onClose: () => setOverlayMessage(null),
+        } as const;
+
+        if (msg.message_type === 'sticker') {
+          return (
+            <MessageOverlay
+              messageType="sticker"
+              stickerUrl={msg.sticker?.media.url ?? ''}
+              {...sharedOverlayProps}
+            />
+          );
+        }
+
+        return (
+          <MessageOverlay
+            messageType={msg.message_type as 'text' | 'audio'}
+            message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
+            attachments={msg.attachments}
+            {...sharedOverlayProps}
+          />
+        );
+      })()}
     </div>
   );
 }

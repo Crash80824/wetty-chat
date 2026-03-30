@@ -45,10 +45,11 @@
   line-height: 1;
 }
 
-.emoji {
+.preview {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
   pointer-events: none;
-  font-size: 44px;
-  line-height: 1;
 }
 
 .removeHint {

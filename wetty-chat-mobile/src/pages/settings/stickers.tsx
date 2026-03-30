@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   IonBackButton,
   IonButtons,
@@ -14,40 +14,47 @@ import {
   IonTitle,
   IonToolbar,
   useIonAlert,
+  useIonToast,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { addOutline, cubeOutline } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { BackButton } from '@/components/BackButton';
+import { createStickerPack, getOwnedStickerPacks, getSubscribedStickerPacks, type StickerPackSummary } from '@/api/stickers';
 import type { BackAction } from '@/types/back-action';
-
-interface MockStickerPack {
-  id: string;
-  name: string;
-  icon: string;
-  stickerCount: number;
-  owned: boolean;
-}
-
-const MOCK_OWNED_PACKS: MockStickerPack[] = [
-  { id: 'smileys', name: 'Smileys', icon: '😀', stickerCount: 12, owned: true },
-];
-
-const MOCK_SUBSCRIBED_PACKS: MockStickerPack[] = [
-  { id: 'animals', name: 'Animals', icon: '🐶', stickerCount: 10, owned: false },
-  { id: 'food', name: 'Food', icon: '🍕', stickerCount: 8, owned: false },
-];
 
 interface StickerSettingsCoreProps {
   backAction?: BackAction;
   onOpenPack?: (packId: string) => void;
 }
 
+
 export function StickerSettingsCore({ backAction, onOpenPack }: StickerSettingsCoreProps) {
   const history = useHistory();
   const [presentAlert] = useIonAlert();
-  const [ownedPacks, setOwnedPacks] = useState(MOCK_OWNED_PACKS);
+  const [presentToast] = useIonToast();
+  const [ownedPacks, setOwnedPacks] = useState<StickerPackSummary[]>([]);
+  const [subscribedPacks, setSubscribedPacks] = useState<StickerPackSummary[]>([]);
+
+  const loadPacks = useCallback(async () => {
+    try {
+      const [ownedRes, subscribedRes] = await Promise.all([getOwnedStickerPacks(), getSubscribedStickerPacks()]);
+      setOwnedPacks(ownedRes.data.packs);
+      setSubscribedPacks(
+        subscribedRes.data.packs.filter(
+          (pack) => !ownedRes.data.packs.some((ownedPack) => ownedPack.id === pack.id),
+        ),
+      );
+    } catch (error) {
+      console.error('Failed to load sticker packs', error);
+      presentToast({ message: t`Failed to load sticker packs`, duration: 2000, position: 'bottom' });
+    }
+  }, [presentToast]);
+
+  useEffect(() => {
+    void loadPacks();
+  }, [loadPacks]);
 
   const handleOpenPack = (packId: string) => {
     if (onOpenPack) {
@@ -65,15 +72,17 @@ export function StickerSettingsCore({ backAction, onOpenPack }: StickerSettingsC
         { text: t`Cancel`, role: 'cancel' },
         {
           text: t`Create`,
-          handler: (data: { name: string }) => {
+          handler: async (data: { name: string }) => {
             const name = data.name.trim();
             if (!name) return false;
-            const id = `pack-${Date.now()}`;
-            console.log('Create sticker pack (placeholder):', name);
-            setOwnedPacks((prev) => [
-              ...prev,
-              { id, name, icon: '📦', stickerCount: 0, owned: true },
-            ]);
+            try {
+              const res = await createStickerPack({ name });
+              setOwnedPacks((prev) => [res.data, ...prev]);
+              handleOpenPack(res.data.id);
+            } catch (error) {
+              console.error('Failed to create sticker pack', error);
+              presentToast({ message: t`Failed to create sticker pack`, duration: 2000, position: 'bottom' });
+            }
           },
         },
       ],
@@ -101,12 +110,14 @@ export function StickerSettingsCore({ backAction, onOpenPack }: StickerSettingsC
         <IonList inset>
           {ownedPacks.map((pack) => (
             <IonItem key={pack.id} button detail onClick={() => handleOpenPack(pack.id)}>
-              <span slot="start" style={{ fontSize: 26, width: 32, textAlign: 'center' }}>
-                {pack.icon}
-              </span>
+              {pack.preview_sticker ? (
+                <img slot="start" src={pack.preview_sticker.media.url} alt="" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} />
+              ) : (
+                <IonIcon aria-hidden="true" icon={cubeOutline} slot="start" color="medium" />
+              )}
               <IonLabel>{pack.name}</IonLabel>
               <IonNote slot="end" color="medium">
-                {pack.stickerCount}
+                {pack.sticker_count}
               </IonNote>
             </IonItem>
           ))}
@@ -124,7 +135,7 @@ export function StickerSettingsCore({ backAction, onOpenPack }: StickerSettingsC
           </IonLabel>
         </IonListHeader>
         <IonList inset>
-          {MOCK_SUBSCRIBED_PACKS.length === 0 ? (
+          {subscribedPacks.length === 0 ? (
             <IonItem>
               <IonIcon aria-hidden="true" icon={cubeOutline} slot="start" color="medium" />
               <IonLabel color="medium">
@@ -132,14 +143,16 @@ export function StickerSettingsCore({ backAction, onOpenPack }: StickerSettingsC
               </IonLabel>
             </IonItem>
           ) : (
-            MOCK_SUBSCRIBED_PACKS.map((pack) => (
+            subscribedPacks.map((pack) => (
               <IonItem key={pack.id} button detail onClick={() => handleOpenPack(pack.id)}>
-                <span slot="start" style={{ fontSize: 26, width: 32, textAlign: 'center' }}>
-                  {pack.icon}
-                </span>
+                {pack.preview_sticker ? (
+                  <img slot="start" src={pack.preview_sticker.media.url} alt="" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} />
+                ) : (
+                  <IonIcon aria-hidden="true" icon={cubeOutline} slot="start" color="medium" />
+                )}
                 <IonLabel>{pack.name}</IonLabel>
                 <IonNote slot="end" color="medium">
-                  {pack.stickerCount}
+                  {pack.sticker_count}
                 </IonNote>
               </IonItem>
             ))

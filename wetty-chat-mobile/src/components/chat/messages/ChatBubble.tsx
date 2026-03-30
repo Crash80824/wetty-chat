@@ -3,22 +3,61 @@ import { IonIcon } from '@ionic/react';
 import { arrowUndo } from 'ionicons/icons';
 import styles from './ChatBubble.module.scss';
 import { ChatBubbleBase, type ChatBubbleBaseProps } from './ChatBubbleBase';
+import { StickerBubble, type StickerBubbleProps } from './StickerBubble';
 
 const SWIPE_THRESHOLD = 60;
 const SWIPE_MAX = 80;
 const LONG_PRESS_DELAY_MS = 350;
 
-export interface ChatBubbleProps extends ChatBubbleBaseProps {
+type StickerChatBubbleProps = StickerBubbleProps & {
+  messageType: 'sticker';
   swipeDirection?: 'left' | 'right';
   onLongPress?: (rect: DOMRect) => void;
+};
+
+type RegularChatBubbleProps = ChatBubbleBaseProps & {
+  swipeDirection?: 'left' | 'right';
+  onLongPress?: (rect: DOMRect) => void;
+};
+
+export type ChatBubbleProps = StickerChatBubbleProps | RegularChatBubbleProps;
+
+function renderInnerBubble(
+  props: ChatBubbleProps,
+  bubbleRef: React.RefObject<HTMLDivElement | null>,
+): React.ReactNode {
+  if (props.messageType === 'sticker') {
+    return (
+      <StickerBubble
+        stickerUrl={props.stickerUrl}
+        senderName={props.senderName}
+        isSent={props.isSent}
+        avatarUrl={props.avatarUrl}
+        showAvatar={props.showAvatar}
+        onStickerTap={props.onStickerTap}
+        onReply={props.onReply}
+        onReplyTap={props.onReplyTap}
+        onAvatarClick={props.onAvatarClick}
+        replyTo={props.replyTo}
+        timestamp={props.timestamp}
+        edited={props.edited}
+        isConfirmed={props.isConfirmed}
+        threadInfo={props.threadInfo}
+        onThreadClick={props.onThreadClick}
+        layout={props.layout}
+        interactionMode={props.interactionMode}
+        bubbleProps={props.bubbleProps}
+        bubbleRef={bubbleRef}
+      />
+    );
+  }
+  // RegularChatBubbleProps includes swipeDirection/onLongPress that ChatBubbleBase doesn't accept
+  const { swipeDirection: _, onLongPress: _lp, ...baseProps } = props;
+  return <ChatBubbleBase {...baseProps} bubbleRef={bubbleRef} />;
 }
 
-export function ChatBubble({
-  swipeDirection = 'left',
-  onLongPress,
-  onReply,
-  ...bubbleProps
-}: ChatBubbleProps) {
+export function ChatBubble(props: ChatBubbleProps) {
+  const { swipeDirection = 'left', onLongPress, onReply } = props;
   const swipeSign = swipeDirection === 'left' ? -1 : 1;
   const [offset, setOffset] = useState(0);
   const [animating, setAnimating] = useState(false);
@@ -119,7 +158,7 @@ export function ChatBubble({
         onContextMenu={handleContextMenu}
         onTransitionEnd={() => setAnimating(false)}
       >
-        <ChatBubbleBase {...bubbleProps} onReply={onReply} bubbleRef={bubbleRef} />
+        {renderInnerBubble(props, bubbleRef)}
       </div>
     </div>
   );

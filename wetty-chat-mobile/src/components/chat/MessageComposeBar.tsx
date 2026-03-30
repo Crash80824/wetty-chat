@@ -11,6 +11,7 @@ import { ComposeInput } from './compose/ComposeInput';
 import { VoiceRecorderPanel } from './compose/VoiceRecorderPanel';
 import { useComposeAttachments } from './compose/useComposeAttachments';
 import { useVoiceRecorder } from './compose/useVoiceRecorder';
+import type { StickerSummary } from '@/api/stickers';
 import type {
   ComposeSendPayload,
   ComposeUploadInput,
@@ -204,10 +205,10 @@ const MessageComposeBarInner = forwardRef<MessageComposeBarHandle, MessageCompos
     });
   }, []);
 
-  const handleStickerSelect = useCallback((stickerId: string) => {
-    console.log('Sticker selected:', stickerId);
+  const handleStickerSelect = useCallback((sticker: StickerSummary) => {
+    onSend({ kind: 'sticker', sticker });
     setStickerPickerOpen(false);
-  }, []);
+  }, [onSend]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -264,8 +265,8 @@ const MessageComposeBarInner = forwardRef<MessageComposeBarHandle, MessageCompos
             editing={editing}
             isUnchangedEdit={isUnchangedEdit}
             onCancelEdit={onCancelEdit}
-            onStickerPress={handleStickerPress}
-            isStickerActive={stickerPickerOpen}
+            onStickerPress={editing ? undefined : handleStickerPress}
+            isStickerActive={!editing && stickerPickerOpen}
           />
         )}
       </div>

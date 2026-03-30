@@ -1,4 +1,5 @@
 import type { AxiosResponse } from 'axios';
+import type { StickerSummary } from './stickers';
 import apiClient from './client';
 
 export interface UserGroupInfo {
@@ -20,6 +21,7 @@ export interface ReplyToMessage {
   id: string;
   message: string | null;
   message_type: 'text' | 'audio' | 'file' | 'system' | 'invite' | 'sticker';
+  sticker?: StickerSummary;
   sender: Sender;
   is_deleted: boolean;
   attachments?: Attachment[];
@@ -61,6 +63,7 @@ export interface MessageResponse {
   id: string;
   message: string | null;
   message_type: 'text' | 'audio' | 'system' | 'invite' | 'sticker';
+  sticker?: StickerSummary;
   reply_root_id: string | null;
   client_generated_id: string;
   sender: Sender;
@@ -84,11 +87,13 @@ export interface ListMessagesResponse {
 export interface CreateMessageBody {
   message?: string;
   message_type: string;
+  sticker_id?: string;
   client_generated_id: string;
   reply_to_id?: string; // Keep in CreateMessageBody
   reply_root_id?: string;
   attachment_ids?: string[];
 }
+
 
 export function getMessages(
   chatId: string | number,

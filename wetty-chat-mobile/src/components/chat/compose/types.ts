@@ -1,11 +1,14 @@
 import type { Attachment } from '@/api/messages';
+import type { StickerSummary } from '@/api/stickers';
 import type { ImageUploadDraft } from '../UploadPreview';
 
 export interface ReplyTo {
   messageId: string;
   username: string;
+  messageType?: string;
   text?: string | null;
   attachments?: Attachment[];
+  firstAttachmentKind?: string;
   isDeleted?: boolean;
 }
 
@@ -53,7 +56,12 @@ export interface ComposeSendAudioPayload {
   uploadedAttachment: ComposeUploadedAttachment;
 }
 
-export type ComposeSendPayload = ComposeSendTextPayload | ComposeSendAudioPayload;
+export interface ComposeSendStickerPayload {
+  kind: 'sticker';
+  sticker: StickerSummary;
+}
+
+export type ComposeSendPayload = ComposeSendTextPayload | ComposeSendAudioPayload | ComposeSendStickerPayload;
 
 export interface DraftUploadRecord {
   draft: ImageUploadDraft;

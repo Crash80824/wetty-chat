@@ -86,7 +86,7 @@ type BubblePropsOverride = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'cl
 };
 
 export interface ChatBubbleBaseProps {
-  messageType?: 'text' | 'audio' | 'system' | 'invite' | 'sticker';
+  messageType?: 'text' | 'audio';
   senderName: string;
   senderGender?: number;
   senderGroup?: UserGroupInfo | null;

@@ -97,6 +97,7 @@ function patchMessageInWindows(
         } else if (current.reply_to_message?.id === messageId) {
           current.reply_to_message.message = message.message;
           current.reply_to_message.message_type = message.message_type;
+          current.reply_to_message.sticker = message.sticker;
           current.reply_to_message.is_deleted = message.is_deleted;
           current.reply_to_message.attachments = message.attachments;
           current.reply_to_message.first_attachment_kind = message.attachments?.[0]?.kind;

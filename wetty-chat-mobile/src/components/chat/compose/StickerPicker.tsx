@@ -1,112 +1,139 @@
-import { useRef, useState } from 'react';
-import { useIonActionSheet, useIonAlert } from '@ionic/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { IonIcon, useIonAlert, useIonToast } from '@ionic/react';
+import { heart, heartDislike } from 'ionicons/icons';
+import { starOutline } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import { AddStickerModal } from './AddStickerModal';
 import styles from './StickerPicker.module.scss';
-
-interface Sticker {
-  id: string;
-  emoji: string;
-  label: string;
-}
-
-interface StickerPack {
-  id: string;
-  name: string;
-  icon: string;
-  owned: boolean;
-  stickers: Sticker[];
-}
-
-const INITIAL_PACKS: StickerPack[] = [
-  {
-    id: 'favorites',
-    name: 'Favorites',
-    icon: '⭐',
-    owned: false,
-    stickers: [
-      { id: 'fav-1', emoji: '⭐', label: 'Star' },
-      { id: 'fav-2', emoji: '❤️', label: 'Heart' },
-      { id: 'fav-3', emoji: '🔥', label: 'Fire' },
-      { id: 'fav-4', emoji: '💯', label: '100' },
-      { id: 'fav-5', emoji: '🎉', label: 'Party' },
-      { id: 'fav-6', emoji: '👍', label: 'Thumbs up' },
-      { id: 'fav-7', emoji: '😂', label: 'Laughing' },
-      { id: 'fav-8', emoji: '🥹', label: 'Holding back tears' },
-    ],
-  },
-  {
-    id: 'smileys',
-    name: 'Smileys',
-    icon: '😀',
-    owned: true,
-    stickers: [
-      { id: 'sml-1', emoji: '😀', label: 'Grinning' },
-      { id: 'sml-2', emoji: '😄', label: 'Grinning with big eyes' },
-      { id: 'sml-3', emoji: '😆', label: 'Grinning squinting' },
-      { id: 'sml-4', emoji: '🤣', label: 'Rolling on the floor' },
-      { id: 'sml-5', emoji: '😅', label: 'Sweat smile' },
-      { id: 'sml-6', emoji: '😊', label: 'Smiling face' },
-      { id: 'sml-7', emoji: '🥰', label: 'Smiling with hearts' },
-      { id: 'sml-8', emoji: '😍', label: 'Heart eyes' },
-      { id: 'sml-9', emoji: '🤩', label: 'Star-struck' },
-      { id: 'sml-10', emoji: '😎', label: 'Cool' },
-      { id: 'sml-11', emoji: '🤔', label: 'Thinking' },
-      { id: 'sml-12', emoji: '😏', label: 'Smirking' },
-    ],
-  },
-  {
-    id: 'animals',
-    name: 'Animals',
-    icon: '🐶',
-    owned: false,
-    stickers: [
-      { id: 'ani-1', emoji: '🐶', label: 'Dog' },
-      { id: 'ani-2', emoji: '🐱', label: 'Cat' },
-      { id: 'ani-3', emoji: '🐭', label: 'Mouse' },
-      { id: 'ani-4', emoji: '🐹', label: 'Hamster' },
-      { id: 'ani-5', emoji: '🐰', label: 'Rabbit' },
-      { id: 'ani-6', emoji: '🦊', label: 'Fox' },
-      { id: 'ani-7', emoji: '🐻', label: 'Bear' },
-      { id: 'ani-8', emoji: '🐼', label: 'Panda' },
-      { id: 'ani-9', emoji: '🐨', label: 'Koala' },
-      { id: 'ani-10', emoji: '🐯', label: 'Tiger' },
-    ],
-  },
-  {
-    id: 'food',
-    name: 'Food',
-    icon: '🍕',
-    owned: false,
-    stickers: [
-      { id: 'food-1', emoji: '🍕', label: 'Pizza' },
-      { id: 'food-2', emoji: '🍔', label: 'Burger' },
-      { id: 'food-3', emoji: '🌮', label: 'Taco' },
-      { id: 'food-4', emoji: '🍜', label: 'Noodles' },
-      { id: 'food-5', emoji: '🍣', label: 'Sushi' },
-      { id: 'food-6', emoji: '🍩', label: 'Donut' },
-      { id: 'food-7', emoji: '🍦', label: 'Ice cream' },
-      { id: 'food-8', emoji: '🧋', label: 'Bubble tea' },
-    ],
-  },
-];
+import {
+  createStickerPack,
+  getFavoriteStickers,
+  getOwnedStickerPacks,
+  getStickerPack,
+  getSubscribedStickerPacks,
+  type StickerPackDetailResponse,
+  type StickerPackSummary,
+  type StickerSummary,
+  favoriteSticker,
+  unfavoriteSticker,
+  uploadStickerToPack,
+} from '@/api/stickers';
 
 interface StickerPickerProps {
   isOpen: boolean;
-  onStickerSelect: (stickerId: string) => void;
+  onStickerSelect: (sticker: StickerSummary) => void;
+}
+
+interface PickerPack {
+  id: string;
+  name: string;
+  previewUrl: string | null;
+  owned: boolean;
+  stickers: StickerSummary[];
+  isLoading: boolean;
 }
 
 export function StickerPicker({ isOpen, onStickerSelect }: StickerPickerProps) {
-  const [packs, setPacks] = useState<StickerPack[]>(INITIAL_PACKS);
-  const [selectedPackId, setSelectedPackId] = useState(INITIAL_PACKS[0].id);
+  const [ownedPacks, setOwnedPacks] = useState<StickerPackSummary[]>([]);
+  const [subscribedPacks, setSubscribedPacks] = useState<StickerPackSummary[]>([]);
+  const [favoriteStickers, setFavoriteStickers] = useState<StickerSummary[]>([]);
+  const [packDetails, setPackDetails] = useState<Record<string, StickerPackDetailResponse>>({});
+  const [selectedPackId, setSelectedPackId] = useState('favorites');
   const [addStickerFile, setAddStickerFile] = useState<File | null>(null);
+  const [isLibraryLoading, setIsLibraryLoading] = useState(false);
+  const hasLoaded = useRef(false);
+  const [loadingPackIds, setLoadingPackIds] = useState<Record<string, boolean>>({});
+  const [popover, setPopover] = useState<{ sticker: StickerSummary; rect: DOMRect } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [presentAlert] = useIonAlert();
-  const [presentActionSheet] = useIonActionSheet();
+  const [presentToast] = useIonToast();
+
+  const loadPackDetail = useCallback(async (packId: string) => {
+    setLoadingPackIds((prev) => ({ ...prev, [packId]: true }));
+    try {
+      const res = await getStickerPack(packId);
+      setPackDetails((prev) => ({ ...prev, [packId]: res.data }));
+      return res.data;
+    } finally {
+      setLoadingPackIds((prev) => {
+        const next = { ...prev };
+        delete next[packId];
+        return next;
+      });
+    }
+  }, []);
+
+  const loadLibrary = useCallback(async () => {
+    if (!hasLoaded.current) {
+      setIsLibraryLoading(true);
+    }
+    try {
+      const [ownedRes, subscribedRes, favoritesRes] = await Promise.all([
+        getOwnedStickerPacks(),
+        getSubscribedStickerPacks(),
+        getFavoriteStickers(),
+      ]);
+      setOwnedPacks(ownedRes.data.packs);
+      setSubscribedPacks(
+        subscribedRes.data.packs.filter(
+          (pack) => !ownedRes.data.packs.some((ownedPack) => ownedPack.id === pack.id),
+        ),
+      );
+      setFavoriteStickers(favoritesRes.data.stickers);
+      hasLoaded.current = true;
+    } catch (error) {
+      console.error('Failed to load sticker library', error);
+      presentToast({ message: t`Failed to load stickers`, duration: 2000, position: 'bottom' });
+    } finally {
+      setIsLibraryLoading(false);
+    }
+  }, [presentToast]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void loadLibrary();
+  }, [isOpen, loadLibrary]);
+
+  const packs = useMemo<PickerPack[]>(() => {
+    const packEntries = [...ownedPacks, ...subscribedPacks].map((pack) => ({
+      id: pack.id,
+      name: pack.name,
+      previewUrl: pack.preview_sticker?.media.url ?? null,
+      owned: ownedPacks.some((ownedPack) => ownedPack.id === pack.id),
+      stickers: packDetails[pack.id]?.stickers ?? [],
+      isLoading: !!loadingPackIds[pack.id],
+    }));
+
+    return [
+      {
+        id: 'favorites',
+        name: t`Favorites`,
+        previewUrl: null,
+        owned: false,
+        stickers: favoriteStickers,
+        isLoading: isLibraryLoading,
+      },
+      ...packEntries,
+    ];
+  }, [favoriteStickers, isLibraryLoading, loadingPackIds, ownedPacks, packDetails, subscribedPacks]);
+
+  useEffect(() => {
+    if (!packs.some((pack) => pack.id === selectedPackId)) {
+      setSelectedPackId('favorites');
+    }
+  }, [packs, selectedPackId]);
+
+  useEffect(() => {
+    if (!isOpen || selectedPackId === 'favorites' || packDetails[selectedPackId] || loadingPackIds[selectedPackId]) {
+      return;
+    }
+    void loadPackDetail(selectedPackId);
+  }, [isOpen, loadPackDetail, loadingPackIds, packDetails, selectedPackId]);
 
   if (!isOpen) return null;
 
-  const activePack = packs.find((p) => p.id === selectedPackId) ?? packs[0];
+  const activePack = packs.find((pack) => pack.id === selectedPackId) ?? packs[0];
 
   const handleCreatePack = () => {
     presentAlert({
@@ -116,19 +143,21 @@ export function StickerPicker({ isOpen, onStickerSelect }: StickerPickerProps) {
         { text: t`Cancel`, role: 'cancel' },
         {
           text: t`Create`,
-          handler: (data: { name: string }) => {
+          handler: async (data: { name: string }) => {
             const name = data.name.trim();
             if (!name) return false;
-            const id = `pack-${Date.now()}`;
-            const newPack: StickerPack = {
-              id,
-              name,
-              icon: '📦',
-              owned: true,
-              stickers: [],
-            };
-            setPacks((prev) => [...prev, newPack]);
-            setSelectedPackId(id);
+            try {
+              const res = await createStickerPack({ name });
+              setOwnedPacks((prev) => [res.data, ...prev]);
+              setPackDetails((prev) => ({
+                ...prev,
+                [res.data.id]: { ...res.data, stickers: [] },
+              }));
+              setSelectedPackId(res.data.id);
+            } catch (error) {
+              console.error('Failed to create pack', error);
+              presentToast({ message: t`Failed to create sticker pack`, duration: 2000, position: 'bottom' });
+            }
           },
         },
       ],
@@ -141,42 +170,73 @@ export function StickerPicker({ isOpen, onStickerSelect }: StickerPickerProps) {
     if (file) setAddStickerFile(file);
   };
 
-  const handleAddSticker = (file: File, emoji: string, name: string) => {
-    console.log('Add sticker (placeholder):', { packId: activePack.id, emoji, name, file: file.name });
-    const newSticker: Sticker = {
-      id: `new-${Date.now()}`,
-      emoji,
-      label: name || emoji,
-    };
-    setPacks((prev) =>
-      prev.map((p) =>
-        p.id === activePack.id ? { ...p, stickers: [...p.stickers, newSticker] } : p,
-      ),
-    );
-    setAddStickerFile(null);
+  const handleAddSticker = async (file: File, emoji: string, name: string) => {
+    if (!activePack || !activePack.owned || activePack.id === 'favorites') return;
+
+    try {
+      const res = await uploadStickerToPack(activePack.id, { file, emoji, name });
+      setPackDetails((prev) => {
+        const detail = prev[activePack.id];
+        if (!detail) return prev;
+        return {
+          ...prev,
+          [activePack.id]: {
+            ...detail,
+            sticker_count: detail.sticker_count + 1,
+            stickers: [...detail.stickers, res.data],
+          },
+        };
+      });
+      setOwnedPacks((prev) =>
+        prev.map((pack) =>
+          pack.id === activePack.id
+            ? { ...pack, sticker_count: pack.sticker_count + 1 }
+            : pack,
+        ),
+      );
+      setAddStickerFile(null);
+      presentToast({ message: t`Sticker added`, duration: 1500, position: 'bottom' });
+    } catch (error) {
+      console.error('Failed to add sticker', error);
+      presentToast({ message: t`Failed to add sticker`, duration: 2000, position: 'bottom' });
+    }
   };
 
-  const handleStickerLongPress = (sticker: Sticker) => {
-    if (activePack.id !== 'favorites') return;
-    presentActionSheet({
-      buttons: [
-        {
-          text: t`Remove from Favorites`,
-          role: 'destructive',
-          handler: () => {
-            console.log('Remove from favorites (placeholder):', sticker.id);
-            setPacks((prev) =>
-              prev.map((p) =>
-                p.id === 'favorites'
-                  ? { ...p, stickers: p.stickers.filter((s) => s.id !== sticker.id) }
-                  : p,
+  const handleStickerLongPress = (sticker: StickerSummary, rect: DOMRect) => {
+    setPopover({ sticker, rect });
+  };
+
+  const handleFavoriteToggle = async () => {
+    if (!popover) return;
+    const { sticker } = popover;
+    const isFav = sticker.is_favorited;
+    setPopover(null);
+
+    try {
+      if (isFav) {
+        await unfavoriteSticker(sticker.id);
+        setFavoriteStickers((prev) => prev.filter((item) => item.id !== sticker.id));
+      } else {
+        await favoriteSticker(sticker.id);
+        setFavoriteStickers((prev) => [...prev, { ...sticker, is_favorited: true }]);
+      }
+      setPackDetails((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([packId, detail]) => [
+            packId,
+            {
+              ...detail,
+              stickers: detail.stickers.map((item) =>
+                item.id === sticker.id ? { ...item, is_favorited: !isFav } : item,
               ),
-            );
-          },
-        },
-        { text: t`Cancel`, role: 'cancel' },
-      ],
-    });
+            },
+          ]),
+        ),
+      );
+    } catch (error) {
+      console.error('Failed to update favorite sticker', error);
+      presentToast({ message: t`Failed to update favorites`, duration: 2000, position: 'bottom' });
+    }
   };
 
   return (
@@ -190,7 +250,7 @@ export function StickerPicker({ isOpen, onStickerSelect }: StickerPickerProps) {
       />
 
       <div className={styles.stickerGrid} role="grid" aria-label={activePack.name}>
-        {activePack.owned && (
+        {activePack.owned && activePack.id !== 'favorites' && (
           <button
             type="button"
             className={`${styles.stickerItem} ${styles.addStickerBtn}`}
@@ -205,9 +265,14 @@ export function StickerPicker({ isOpen, onStickerSelect }: StickerPickerProps) {
             key={sticker.id}
             sticker={sticker}
             onSelect={onStickerSelect}
-            onLongPress={activePack.id === 'favorites' ? handleStickerLongPress : undefined}
+            onLongPress={handleStickerLongPress}
           />
         ))}
+        {!activePack.isLoading && activePack.stickers.length === 0 && (
+          <div className={styles.emptyState}>
+            {t`No stickers`}
+          </div>
+        )}
       </div>
 
       <div className={styles.packBar} role="tablist" aria-label={t`Sticker packs`}>
@@ -222,7 +287,11 @@ export function StickerPicker({ isOpen, onStickerSelect }: StickerPickerProps) {
             onClick={() => setSelectedPackId(pack.id)}
           >
             <span className={styles.packIcon} aria-hidden="true">
-              {pack.icon}
+              {pack.previewUrl ? (
+                <img src={pack.previewUrl} alt="" className={styles.packIconImg} />
+              ) : (
+                <IonIcon icon={starOutline} />
+              )}
             </span>
           </button>
         ))}
@@ -245,54 +314,84 @@ export function StickerPicker({ isOpen, onStickerSelect }: StickerPickerProps) {
         onDismiss={() => setAddStickerFile(null)}
         onAdd={handleAddSticker}
       />
+
+      {popover && createPortal(
+        <>
+          <div className={styles.popoverBackdrop} onClick={() => setPopover(null)} />
+          <div
+            className={styles.popover}
+            style={{ top: popover.rect.top, left: popover.rect.left + popover.rect.width / 2 }}
+          >
+            <button type="button" className={styles.popoverItem} onClick={handleFavoriteToggle}>
+              <IonIcon icon={popover.sticker.is_favorited ? heartDislike : heart} />
+              {popover.sticker.is_favorited ? t`Remove from Favorites` : t`Add to Favorites`}
+            </button>
+          </div>
+        </>,
+        document.body,
+      )}
     </div>
   );
 }
 
-// Separate component to handle long-press cleanly
 function StickerButton({
   sticker,
   onSelect,
   onLongPress,
 }: {
-  sticker: Sticker;
-  onSelect: (id: string) => void;
-  onLongPress?: (sticker: Sticker) => void;
+  sticker: StickerSummary;
+  onSelect: (sticker: StickerSummary) => void;
+  onLongPress?: (sticker: StickerSummary, rect: DOMRect) => void;
 }) {
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimeoutRef = useRef<number | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
-  const handleTouchStart = () => {
-    if (!onLongPress) return;
-    longPressTimer.current = setTimeout(() => {
-      onLongPress(sticker);
-    }, 500);
+  const clearLongPress = () => {
+    if (longPressTimeoutRef.current != null) {
+      window.clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
   };
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+  const fireLongPress = () => {
+    if (btnRef.current) {
+      onLongPress?.(sticker, btnRef.current.getBoundingClientRect());
     }
+  };
+
+  const startLongPress = () => {
+    if (!onLongPress) return;
+    longPressTimeoutRef.current = window.setTimeout(() => {
+      longPressTimeoutRef.current = null;
+      fireLongPress();
+    }, 450);
+  };
+
+  const handleClick = () => {
+    clearLongPress();
+    onSelect(sticker);
   };
 
   return (
     <button
+      ref={btnRef}
       type="button"
-      role="gridcell"
-      aria-label={sticker.label}
+      aria-label={sticker.name || sticker.emoji}
       className={styles.stickerItem}
-      onClick={() => onSelect(sticker.id)}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onClick={handleClick}
+      onTouchStart={startLongPress}
+      onTouchEnd={clearLongPress}
+      onTouchCancel={clearLongPress}
       onContextMenu={(e) => {
         e.preventDefault();
-        onLongPress?.(sticker);
+        fireLongPress();
       }}
     >
-      <span className={styles.stickerEmoji} aria-hidden="true">
-        {sticker.emoji}
-      </span>
+      {sticker.media.content_type.startsWith('video/') ? (
+        <video src={sticker.media.url} className={styles.stickerThumb} autoPlay loop muted playsInline />
+      ) : (
+        <img src={sticker.media.url} alt="" className={styles.stickerThumb} />
+      )}
     </button>
   );
 }

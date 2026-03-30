@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonBackButton,
   IonButton,
@@ -14,71 +14,21 @@ import {
 import { useParams } from 'react-router-dom';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
+import { useHistory } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { BackButton } from '@/components/BackButton';
 import { AddStickerModal } from '@/components/chat/compose/AddStickerModal';
+import {
+  getStickerPack,
+  removeStickerFromPack,
+  type StickerPackDetailResponse,
+  type StickerSummary,
+  unsubscribeStickerPack,
+  uploadStickerToPack,
+} from '@/api/stickers';
+import type { RootState } from '@/store';
 import type { BackAction } from '@/types/back-action';
 import styles from './StickerPackDetail.module.scss';
-
-interface MockSticker {
-  id: string;
-  emoji: string;
-  label: string;
-}
-
-// Same mock packs keyed by id — in real impl this would come from API/store
-const MOCK_PACK_DATA: Record<string, { name: string; icon: string; owned: boolean; stickers: MockSticker[] }> = {
-  smileys: {
-    name: 'Smileys',
-    icon: '😀',
-    owned: true,
-    stickers: [
-      { id: 'sml-1', emoji: '😀', label: 'Grinning' },
-      { id: 'sml-2', emoji: '😄', label: 'Grinning with big eyes' },
-      { id: 'sml-3', emoji: '😆', label: 'Grinning squinting' },
-      { id: 'sml-4', emoji: '🤣', label: 'Rolling on the floor' },
-      { id: 'sml-5', emoji: '😅', label: 'Sweat smile' },
-      { id: 'sml-6', emoji: '😊', label: 'Smiling face' },
-      { id: 'sml-7', emoji: '🥰', label: 'Smiling with hearts' },
-      { id: 'sml-8', emoji: '😍', label: 'Heart eyes' },
-      { id: 'sml-9', emoji: '🤩', label: 'Star-struck' },
-      { id: 'sml-10', emoji: '😎', label: 'Cool' },
-      { id: 'sml-11', emoji: '🔥', label: 'Fire' },
-      { id: 'sml-12', emoji: '😏', label: 'Smirking' },
-    ],
-  },
-  animals: {
-    name: 'Animals',
-    icon: '🐶',
-    owned: false,
-    stickers: [
-      { id: 'ani-1', emoji: '🐶', label: 'Dog' },
-      { id: 'ani-2', emoji: '🐱', label: 'Cat' },
-      { id: 'ani-3', emoji: '🐭', label: 'Mouse' },
-      { id: 'ani-4', emoji: '🐹', label: 'Hamster' },
-      { id: 'ani-5', emoji: '🐰', label: 'Rabbit' },
-      { id: 'ani-6', emoji: '🦊', label: 'Fox' },
-      { id: 'ani-7', emoji: '🐻', label: 'Bear' },
-      { id: 'ani-8', emoji: '🐼', label: 'Panda' },
-      { id: 'ani-9', emoji: '🐨', label: 'Koala' },
-      { id: 'ani-10', emoji: '🐯', label: 'Tiger' },
-    ],
-  },
-  food: {
-    name: 'Food',
-    icon: '🍕',
-    owned: false,
-    stickers: [
-      { id: 'food-1', emoji: '🍕', label: 'Pizza' },
-      { id: 'food-2', emoji: '🍔', label: 'Burger' },
-      { id: 'food-3', emoji: '🌮', label: 'Taco' },
-      { id: 'food-4', emoji: '🍜', label: 'Noodles' },
-      { id: 'food-5', emoji: '🍣', label: 'Sushi' },
-      { id: 'food-6', emoji: '🍩', label: 'Donut' },
-      { id: 'food-7', emoji: '🍦', label: 'Ice cream' },
-      { id: 'food-8', emoji: '🧋', label: 'Bubble tea' },
-    ],
-  },
-};
 
 interface StickerPackDetailCoreProps {
   packId: string;
@@ -86,14 +36,29 @@ interface StickerPackDetailCoreProps {
 }
 
 export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailCoreProps) {
-  const packData = MOCK_PACK_DATA[packId];
-  const [stickers, setStickers] = useState<MockSticker[]>(packData?.stickers ?? []);
+  const history = useHistory();
+  const currentUserId = useSelector((state: RootState) => state.user.uid);
+  const [pack, setPack] = useState<StickerPackDetailResponse | null>(null);
   const [addStickerFile, setAddStickerFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [presentAlert] = useIonAlert();
   const [presentToast] = useIonToast();
 
-  if (!packData) {
+  const loadPack = useCallback(async () => {
+    try {
+      const res = await getStickerPack(packId);
+      setPack(res.data);
+    } catch (error) {
+      console.error('Failed to load sticker pack', error);
+      presentToast({ message: t`Failed to load sticker pack`, duration: 2000, position: 'bottom' });
+    }
+  }, [packId, presentToast]);
+
+  useEffect(() => {
+    void loadPack();
+  }, [loadPack]);
+
+  if (!pack) {
     return (
       <IonPage>
         <IonHeader>
@@ -108,14 +73,14 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
         </IonHeader>
         <IonContent className="ion-padding">
           <p>
-            <Trans>Pack not found.</Trans>
+            <Trans>Loading...</Trans>
           </p>
         </IonContent>
       </IonPage>
     );
   }
 
-  const { name, owned } = packData;
+  const owned = pack.owner_uid === currentUserId;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -123,17 +88,27 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
     if (file) setAddStickerFile(file);
   };
 
-  const handleAddSticker = (file: File, emoji: string, stickerName: string) => {
-    console.log('Add sticker to pack (placeholder):', { packId, emoji, name: stickerName, file: file.name });
-    setStickers((prev) => [
-      ...prev,
-      { id: `new-${Date.now()}`, emoji, label: stickerName || emoji },
-    ]);
-    setAddStickerFile(null);
-    presentToast({ message: t`Sticker added`, duration: 1500, position: 'bottom' });
+  const handleAddSticker = async (file: File, emoji: string, stickerName: string) => {
+    try {
+      const res = await uploadStickerToPack(packId, { file, emoji, name: stickerName });
+      setPack((prev) =>
+        prev
+          ? {
+              ...prev,
+              sticker_count: prev.sticker_count + 1,
+              stickers: [...prev.stickers, res.data],
+            }
+          : prev,
+      );
+      setAddStickerFile(null);
+      presentToast({ message: t`Sticker added`, duration: 1500, position: 'bottom' });
+    } catch (error) {
+      console.error('Failed to add sticker', error);
+      presentToast({ message: t`Failed to add sticker`, duration: 2000, position: 'bottom' });
+    }
   };
 
-  const handleRemoveSticker = (stickerId: string) => {
+  const handleRemoveSticker = (sticker: StickerSummary) => {
     presentAlert({
       header: t`Remove Sticker`,
       message: t`Remove this sticker from the pack?`,
@@ -142,9 +117,22 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
         {
           text: t`Remove`,
           role: 'destructive',
-          handler: () => {
-            console.log('Remove sticker (placeholder):', stickerId);
-            setStickers((prev) => prev.filter((s) => s.id !== stickerId));
+          handler: async () => {
+            try {
+              await removeStickerFromPack(packId, sticker.id);
+              setPack((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      sticker_count: Math.max(prev.sticker_count - 1, 0),
+                      stickers: prev.stickers.filter((item) => item.id !== sticker.id),
+                    }
+                  : prev,
+              );
+            } catch (error) {
+              console.error('Failed to remove sticker', error);
+              presentToast({ message: t`Failed to remove sticker`, duration: 2000, position: 'bottom' });
+            }
           },
         },
       ],
@@ -160,8 +148,14 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
         {
           text: t`Unsubscribe`,
           role: 'destructive',
-          handler: () => {
-            console.log('Unsubscribe from pack (placeholder):', packId);
+          handler: async () => {
+            try {
+              await unsubscribeStickerPack(packId);
+              history.replace('/settings/stickers');
+            } catch (error) {
+              console.error('Failed to unsubscribe from sticker pack', error);
+              presentToast({ message: t`Failed to unsubscribe`, duration: 2000, position: 'bottom' });
+            }
           },
         },
       ],
@@ -175,7 +169,7 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
           <IonButtons slot="start">
             {backAction ? <BackButton action={backAction} /> : <IonBackButton defaultHref="/settings/stickers" />}
           </IonButtons>
-          <IonTitle>{name}</IonTitle>
+          <IonTitle>{pack.name}</IonTitle>
           {!owned && (
             <IonButtons slot="end">
               <IonButton color="danger" onClick={handleUnsubscribe}>
@@ -204,16 +198,20 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
               <span className={styles.addIcon} aria-hidden="true">+</span>
             </button>
           )}
-          {stickers.map((sticker) => (
+          {pack.stickers.map((sticker) => (
             <button
               key={sticker.id}
               type="button"
               className={styles.cell}
-              aria-label={sticker.label}
-              onClick={owned ? () => handleRemoveSticker(sticker.id) : undefined}
+              aria-label={sticker.name || sticker.emoji}
+              onClick={owned ? () => handleRemoveSticker(sticker) : undefined}
               style={{ cursor: owned ? 'pointer' : 'default' }}
             >
-              <span className={styles.emoji} aria-hidden="true">{sticker.emoji}</span>
+              {sticker.media.content_type.startsWith('video/') ? (
+                <video src={sticker.media.url} className={styles.preview} autoPlay loop muted playsInline />
+              ) : (
+                <img src={sticker.media.url} alt="" className={styles.preview} />
+              )}
               {owned && <span className={styles.removeHint} aria-hidden="true">✕</span>}
             </button>
           ))}
